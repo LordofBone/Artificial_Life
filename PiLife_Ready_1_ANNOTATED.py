@@ -15,15 +15,26 @@ from mcpi.minecraft import Minecraft
 #set minecraft mode to false by default
 minecraftMode = False
 
-#assign total number of lifeforms possible to an argument that can be passed into python
-lifeFormTotal = sys.argv[1]
-
-#if the user doesnt know what the input arguments are they can type in '/help' after the program to get instructions
-if lifeFormTotal == str("/help"):
+if len(sys.argv) < 6:
 	print ('6 variables are required for this program: <initial no. of lifeforms> <processing time> <max no. of lifeforms> <max lifetime> <max aggression factor> <"-mc" for Minecraft Mode (optional)')
 	sys.exit()
-else:
-	lifeFormTotal = int(lifeFormTotal)
+
+try:
+    sys.argv[1] = int(sys.argv[1])
+    sys.argv[2] = int(sys.argv[2])
+    sys.argv[3] = int(sys.argv[3])
+    sys.argv[4] = int(sys.argv[4])
+    sys.argv[5] = int(sys.argv[5])
+except ValueError:
+	print ('6 variables are required for this program: <initial no. of lifeforms> <processing time> <max no. of lifeforms> <max lifetime> <max aggression factor> <"-mc" for Minecraft Mode (optional)')
+	sys.exit()
+
+#assign total number of lifeforms possible to an argument that can be passed into python
+#if sys.arv[1] is None:
+#	print ('6 variables are required for this program: <initial no. of lifeforms> <processing time> <max no. of lifeforms> <max lifetime> <max aggression factor> <"-mc" for Minecraft Mode (optional)')
+#	sys.exit()
+	
+lifeFormTotal = sys.argv[1]
 
 #assign the loop delay with a second argument that can be passed into python
 timeSet = int(sys.argv[2])
@@ -37,13 +48,16 @@ maxTTL = int(sys.argv[4])
 #assign the aggression factor for lifeforms with a fifth argument that can be passed into python
 maxAggro = int(sys.argv[5])
 
-#final optional fourth argument that determines whether the program with interact with a running instance of minecraft on the pi
+#final optional sixth argument that determines whether the program with interact with a running instance of minecraft on the pi
 if len(sys.argv) == 7:
 	if sys.argv[6] == ('-mc'):
 
 		minecraftMode = True
 		mc = Minecraft.create()
 		mc.postToChat("PiLife Plugged into Minecraft!")
+	else:
+		print ('Sixth argument must be "-mc" to activate Minecraft mode')
+		sys.exit()
 		
 #unicorn hat setup		
 unicorn.set_layout(unicorn.AUTO)
@@ -213,6 +227,20 @@ class lifeForm(object):
 			self.blueColor = 0
 			iListIn.remove(self.Id)
 			return (iListIn)
+			
+	#function to call for erasing an entity from the board by fading it away as well as removing from the main list for lifeforms
+	def fadeEntity(self, iListIn):
+		for c in range(0, 255):
+			if (self.redColor > 0):
+				self.redColor -= 1
+			if (self.greenColor > 0):
+				self.greenColor -= 1
+			if (self.blueColor > 0):
+				self.blueColor -= 1
+			unicorn.set_pixel(self.matrixPositionX, self.matrixPositionY, self.redColor, self.greenColor, self.blueColor)
+			unicorn.show()
+		iListIn.remove(self.Id)
+		return (iListIn)
 		
 	#print the number of lifeforms currently on the board
 def printLifeformNo(no):
@@ -222,7 +250,7 @@ def printLifeformNo(no):
 #draw the position and colour of the current lifeform onto the board, if minecraft mode true, also setblocks relative to the player in the game world, adding 1 to the layer every iteration so that each time the current amount of entites are rendered it moves to another layer in minecraft, essentially building upwards
 def drawLEDS(x, y, r, g, b, layer):
 	unicorn.set_pixel(x, y, r, g, b)
-	unicorn.show()
+	#unicorn.show()
 	if minecraftMode == True:
 		playerX, playerY, playerZ = mc.player.getPos()
 		random.seed(r+g+b)
@@ -243,6 +271,18 @@ def percentage(percent, whole):
 def genRandom():
 	
 	return random.randint(1, 1000000000000)
+
+#function to randomly kill half of the entities in existence on the board	
+def thanosSnap(iList):
+	#loop for 50% of all existing enties choosing at random to eliminate
+	for x in range(len(iList)/2):
+		vanished = random.choice(iList)
+		iList = holder[vanished].fadeEntity(iList)
+		time.sleep(0.1)
+	print("perfectly balanced as all things should be")
+	time.sleep(2)
+	return iList
+		
 
 #function used to determine whether a lifeform is colliding with another currently on the board	
 def collisionDetector(boardPositions, posX, posY, Id):
@@ -285,6 +325,11 @@ def assignClasses(total):
 		iList.append(i)
 	
 	return (iList)
+	
+def boardPositionGenerator():
+	posXGen = random.randint(0, 7)
+	posYGen = random.randint(0, 7)
+	return posXGen, posYGen
   
 #obtain lifeform id list from the above function  
 iList = assignClasses(lifeFormTotal)
@@ -294,10 +339,11 @@ holder = {Id: lifeForm(Id=Id) for Id in iList}
 #for each id in the list of all lifeform ids assign a random x and y number for the position on the board and create the new lifeform with random seeds for each lifeseed generation
 for Id in iList:
 	
-	posXGen = random.randint(1, 8)
-	posYGen = random.randint(1, 8)
+	posXGen, posYGen = boardPositionGenerator()
+	#posXGen = random.randint(1, 8)
+	#posYGen = random.randint(1, 8)
 	generateLifeformAttribsSpark(Id, genRandom(), genRandom(), genRandom(), posXGen, posYGen)
-
+	
 #wrap main loop into a try: to catch keyboard exit
 try:
 	while True:
@@ -352,15 +398,17 @@ try:
 						#the breeding will attempt only if the current lifeform count is not above the population limit
 						if lifeFormTotalCount < popLimit:
 							#generate 2 random numbers for x and y positions of the new entity
-							posXGen = random.randint(1, 8)
-							posYGen = random.randint(1, 8)
+							posXGen, posYGen = boardPositionGenerator()
+							#posXGen = random.randint(1, 8)
+							#posYGen = random.randint(1, 8)
 							
 							#check for an entity at this position
 							for i in posList:
 								colliderScopeBirthConflicter = collisionDetector(posList, posXGen, posYGen, Id)			
 								if colliderScopeBirthConflicter:
-									posXGen = random.randint(1, 8)
-									posYGen = random.randint(1, 8)
+									posXGen, posYGen = boardPositionGenerator()
+									#posXGen = random.randint(1, 8)
+									#posYGen = random.randint(1, 8)
 									
 									#if the aggression factor is too low for the entity collided with and there is an entity at the current location its offspring wants to spawn, it will not do anything and no new entity will spawn
 									if holder[colliderScope].aggressionFactor < 250:
@@ -450,9 +498,14 @@ try:
 		
 		#uncomment below line to display the current amount of lifeforms on the board
 		#printLifeformNo(lifeFormTotalCount)
+		
+		#show leds
+		unicorn.show()
+		
 		#time to sleep before next loop iteration, controlled from argument above
 		time.sleep(timeSet)
 
 #upon keyboard interrupt display information about the program run before exiting
 except KeyboardInterrupt:
 	print ('\n' + 'Program ended by user.' + '\n' + 'Total lifeforms produced: ' + str(lifeFormTotal) + '\n' + 'Max concurrent Lifeforms was: ' + str(highestConcurrentLifeforms) + '\n' + 'Last count of active Lifeforms: ' + str(lifeFormTotalCount))
+	GPIO.cleanup()
