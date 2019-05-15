@@ -14,10 +14,28 @@ A more detailed set of instructions is available on the blog post for this proje
 
 1. Install Raspbian on an Raspberry Pi. 
 2. Clone the repository
-3. Run the program with the following arguments
+3. Install the dependencies
 
 ```
-#The arguments in order are: number of life forms to start, the amount of seconds between loops, max number of lifeforms, max time to live for any entity (in loops), max agression factor
+
+sudo pip install -r requirements.txt
+
+```
+
+### Running The Program
+
+Run the program from the command line. 
+
+```
+
 sudo python PiLife_Ready_1_ANNOTATED.py 1 2 1 10000 1000
 
 ```
+
+The arguments, in order, specify the following: 
+
+1. Number of life forms to start the program
+2. Amount of seconds between program loops
+3. Max number of lifeforms at any given time
+4. Max time to live a life form can have
+5. Max agression factor a life form can have
