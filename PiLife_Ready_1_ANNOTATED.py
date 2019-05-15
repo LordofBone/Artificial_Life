@@ -10,7 +10,7 @@ from operator import itemgetter
 
 import unicornhat as unicorn
 
-#from mcpi.minecraft import Minecraft
+from mcpi.minecraft import Minecraft
 
 #set minecraft mode to false by default
 minecraftMode = False
