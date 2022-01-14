@@ -374,7 +374,7 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
 
             random.shuffle(x_list)
             random.shuffle(y_list)
-
+            # todo: see if this is redundant
             if not list(holder):
                 post_x_gen = random.randint(0, 7)
                 post_y_gen = random.randint(0, 7)
