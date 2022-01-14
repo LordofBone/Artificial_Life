@@ -44,6 +44,7 @@ sudo env PATH="$PATH" python artificial_life.py
 
 Arguments that can be passed: 
 
+```
   -ilc LIFE_FORM_TOTAL, --initial-lifeforms-count LIFE_FORM_TOTAL
                         Number of lifeforms to start with
   -s LOOP_SPEED, --speed LOOP_SPEED
@@ -70,3 +71,4 @@ Arguments that can be passed:
                         expiry of all entities
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
+```
