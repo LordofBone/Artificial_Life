@@ -34,7 +34,7 @@ sudo pip install -r requirements.txt
 
 ### Running The Program
 
-Run the program from the command line. 
+Run the program from the command line - for some reason I have found that it requires sudo to work with the HAT.
 
 ```
 
