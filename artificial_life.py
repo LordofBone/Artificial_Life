@@ -26,6 +26,7 @@ class LifeForm(object):
     """
     The main class that handles each life forms initialisation, movement, colour, expiry and statistics
     """
+
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
         """
         When class initialised it gives the life form its properties from the random numbers inserted into it,
@@ -42,15 +43,15 @@ class LifeForm(object):
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
         self.red_color = random.randint(1, 255)
-        self.max_aggression_factor = random.randint(1, max_aggro)
+        self.max_aggression_factor = random.randint(1, args.max_aggro)
         self.direction_no = random.randint(1, 9)
-        self.max_life = random.randint(1, max_ttl)
+        self.max_life = random.randint(1, args.max_ttl)
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
         self.green_color = random.randint(1, 255)
         self.aggression_factor = random.randint(0, self.max_aggression_factor)
-        self.time_to_move = random.randint(1, max_move_limit)
+        self.time_to_move = random.randint(1, args.max_moves)
         self.time_to_move_count = self.time_to_move
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
@@ -59,7 +60,7 @@ class LifeForm(object):
         self.time_to_live = random.randint(0, self.max_life)
         self.time_to_live_count = self.time_to_live
         self.moving_life_form_percent = random.randint(1, 100)
-        if self.moving_life_form_percent < static_chance:
+        if self.moving_life_form_percent < args.static_entity:
             self.moving_life_form = False
             self.direction = 9
         else:
@@ -230,6 +231,7 @@ class LifeForm(object):
             unicorn.show()
         del holder[self.life_form_id]
 
+
 def draw_leds(x, y, r, g, b, current_layer):
     """
     Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
@@ -250,6 +252,7 @@ def clear_leds():
     Clear Unicorn HAT LEDs.
     """
     unicorn.clear()
+
 
 def percentage(percent, whole):
     """
@@ -645,7 +648,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
             unicorn.show()
 
             # time to sleep before next loop iteration, controlled from argument above
-            time.sleep(time_set)
+            time.sleep(args.loop_speed)
 
     # upon keyboard interrupt display information about the program run before exiting
     except KeyboardInterrupt:
@@ -706,33 +709,6 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    # total number of lifeforms to start off with
-    life_form_total = args.life_form_total
-
-    # assign the loop delay with a second argument that can be passed into python
-    time_set = args.loop_speed
-
-    # assign the population limit of life forms with a third argument that can be passed into python
-    pop_limit = args.pop_limit
-
-    # assign the max time to live possible for life forms with a fourth argument that can be passed into python
-    max_ttl = args.max_ttl
-
-    # assign the aggression factor for life forms with a fifth argument that can be passed into python
-    max_aggro = args.max_aggro
-
-    dna_chance = args.dna_chaos
-
-    static_chance = args.static_entity
-
-    max_move_limit = args.max_moves
-
-    # prevents clearing of leds to enable 'trails' of lifeforms
-    trails = args.trails_on
-
-    # control retries; so if every entity expires the loop will restart and try again
-    retry = args.retry_on
-
     minecraft_mode = args.mc_mode
     if minecraft_mode:
         mc = Minecraft.create()
@@ -740,8 +716,9 @@ if __name__ == '__main__':
 
     holder = {}
 
-    for i in range(life_form_total):
+    for i in range(args.life_form_total):
         holder.update(class_generator(i))
 
-    main(concurrent_lifeforms_max=pop_limit, life_form_total_count=life_form_total, draw_trails=trails,
-         retries=retry, random_dna_chance=dna_chance)
+    main(concurrent_lifeforms_max=args.pop_limit, life_form_total_count=args.life_form_total,
+         draw_trails=args.trails_on,
+         retries=args.retry_on, random_dna_chance=args.dna_chaos)
