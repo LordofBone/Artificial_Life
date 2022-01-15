@@ -7,7 +7,8 @@ import unicornhat as unicorn
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
-    logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness
+    logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
+    combine_threshold
 
 logger = logging.getLogger("alife-logger")
 
@@ -26,6 +27,7 @@ class LifeForm(object):
     """
     The main class that handles each life forms initialisation, movement, colour, expiry and statistics.
     """
+
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
         """
         When class initialised it gives the life form its properties from the random numbers inserted into it,
@@ -34,6 +36,11 @@ class LifeForm(object):
         generated from them are non-linear i.e. higher life seed does not equal higher life span etc.
         """
         self.life_form_id = life_form_id
+
+        # set linked status to False; when linked an entity will continue to move in the same direction as the entity
+        # it is linked with essentially combining into one bigger entity
+        self.linked_up = False
+        self.linked_to = 0
 
         self.life_seed1 = seed
         self.life_seed2 = seed2
@@ -181,11 +188,21 @@ class LifeForm(object):
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change direction from
             # the "randomise direction" function being called
-            if self.time_to_move_count > 0:
-                self.time_to_move_count -= 1
-            elif self.time_to_move_count <= 0:
-                self.time_to_move_count = self.time_to_move
-                self.direction = self.randomise_direction()
+            if not self.linked_up:
+                if self.time_to_move_count > 0:
+                    self.time_to_move_count -= 1
+                elif self.time_to_move_count <= 0:
+                    self.time_to_move_count = self.time_to_move
+                    self.direction = self.randomise_direction()
+            else:
+                # if combining is enabled set to the direction of the linked entity, however the other entity may
+                # have expired and weird things happen, and it may not be accessible from within the class holder
+                # so just randomise direction and de-link
+                try:
+                    self.direction = holder[self.linked_to].direction
+                except KeyError:
+                    self.linked_up = False
+                    self.direction = self.randomise_direction()
 
     def randomise_direction(self, exclusion_list=None):
         """
@@ -202,6 +219,10 @@ class LifeForm(object):
         except IndexError:
             r = False
         return r
+
+    def linked(self, life_form_id):
+        self.linked_up = True
+        self.linked_to = life_form_id
 
     def expire_entity(self):
         """
@@ -451,17 +472,27 @@ def fifty_fifty():
     return False
 
 
+def combine_entities(life_form_1, life_form_2):
+    """
+    If the aggression factor of both entities is within the combine_threshold range they will reach a stalemate and
+    simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
+    """
+    if holder[life_form_1].aggression_factor + args.combine_threshold > \
+            holder[life_form_2].aggression_factor > \
+            holder[life_form_1].aggression_factor - args.combine_threshold:
+        if args.combine_mode:
+            logger.debug(f'Entity: {life_form_1} combined with: {life_form_2}')
+            holder[life_form_2].linked(life_form_id=life_form_1)
+            holder[life_form_2].direction = holder[life_form_1].direction
+        else:
+            logger.debug('Neither entity killed')
+
+
 def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, random_dna_chance,
-         highest_concurrent_lifeforms=0,
-         current_layer=0):
+         highest_concurrent_lifeforms=0, current_layer=0):
     """
     Main loop where all life form movement and interaction takes place
     """
-
-    # store the initial starting number so that if retries are enabled the same amount of entities can be generated
-    # again
-    base_starting_number = len(holder)
-
     # wrap main loop into a try/catch to allow keyboard exit and cleanup
     try:
         while True:
@@ -533,6 +564,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                         if holder[life_form_id].aggression_factor < breed_threshold:
                             # the other entity also needs to have its aggression factor below the breed threshold
                             if holder[collision_detected].aggression_factor < breed_threshold:
+                                combine_entities(life_form_1=life_form_id, life_form_2=collision_detected)
                                 # the breeding will attempt only if the current life form count is not above the
                                 # population limit
                                 if current_life_form_amount < concurrent_lifeforms_max:
@@ -626,10 +658,24 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
 
                                 continue
 
-                            # if the aggression factor of both entities is life_form_identical they will reach a
-                            # stalemate and simply bounce off each other
                             elif holder[collision_detected].aggression_factor == holder[life_form_id].aggression_factor:
-                                logger.debug('Neither entity killed')
+                                logger.debug('Entities matched, flipping coin')
+
+                                if fifty_fifty():
+                                    logger.debug('Current entity killed')
+                                    holder[collision_detected].time_to_live_count += holder[
+                                        life_form_id].time_to_live_count
+
+                                    del holder[life_form_id]
+
+                                    continue
+                                else:
+                                    logger.debug('Other entity killed')
+
+                                    holder[life_form_id].time_to_live_count += holder[
+                                        collision_detected].time_to_live_count
+
+                                    del holder[collision_detected]
 
                     holder[life_form_id].movement()
 
@@ -647,7 +693,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                     highest_concurrent_lifeforms = 0
                     current_layer = 0
 
-                    for n in range(base_starting_number):
+                    for n in range(args.life_form_total):
                         holder.update(class_generator(n))
 
                     continue
@@ -705,6 +751,14 @@ if __name__ == '__main__':
     parser.add_argument('-mt', '--max-move-time', action="store", dest="max_moves", type=int,
                         default=max_time_to_move,
                         help='Maximum possible time to move number for entities')
+
+    parser.add_argument('-ct', '--combine-threshold', action="store", dest="combine_threshold", type=int,
+                        default=combine_threshold,
+                        help='If a life form collides with another and both of their aggression levels are within '
+                             'this range and combining is enabled, they will combine (move together)')
+
+    parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode",
+                        help='Enables life forms to combine into bigger ones')
 
     parser.add_argument('-mc', '--minecraft-mode', action="store_true", dest="mc_mode",
                         help='Enables Minecraft mode')

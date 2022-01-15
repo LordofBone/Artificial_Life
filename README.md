@@ -63,6 +63,11 @@ Arguments that can be passed:
                         Percentage chance of an entity being static
   -mt MAX_MOVES, --max-move-time MAX_MOVES
                         Maximum possible time to move number for entities
+  -ct COMBINE_THRESHOLD, --combine-threshold COMBINE_THRESHOLD
+                        If a life form collides with another and both of their
+                        aggression levels are within this range and combining
+                        is enabled, they will combine (move together)
+  -c, --combine-mode    Enables life forms to combine into bigger ones
   -mc, --minecraft-mode
                         Enables Minecraft mode
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
