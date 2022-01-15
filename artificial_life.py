@@ -22,15 +22,19 @@ u_width_max = u_width - 1
 u_height_max = u_height - 1
 
 
-# the main class that handles each life forms initialisation, movement, colour, expiry and statistics
 class LifeForm(object):
-
-    # standard class initialisation
+    """
+    The main class that handles each life forms initialisation, movement, colour, expiry and statistics
+    """
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
+        """
+        When class initialised it gives the life form its properties from the random numbers inserted into it,
+        the life seeds are used to seed random number generators that then are used to generate the life form
+        properties, this is so that the same results will come from the same life seeds and that the properties
+        generated from them are non-linear i.e. higher life seed does not equal higher life span etc.
+        """
         self.life_form_id = life_form_id
 
-        # when this function is called it gives the life form of the class instance its properties from the random
-        # numbers inserted into it
         self.life_seed1 = seed
         self.life_seed2 = seed2
         self.life_seed3 = seed3
@@ -68,8 +72,10 @@ class LifeForm(object):
         self.matrix_position_x = start_x
         self.matrix_position_y = start_y
 
-    # when called this function will display the statistics of the current life form in the main loop
     def get_stats(self):
+        """
+        Display stats of life form.
+        """
         logger.debug(f'ID: {self.life_form_id}')
         logger.debug(f'Seed 1: {self.life_seed1}')
         logger.debug(f'Seed 2: {self.life_seed2}')
@@ -84,11 +90,13 @@ class LifeForm(object):
         logger.debug(f'Position Y: {self.matrix_position_y}')
         logger.debug(f'Color: R-{self.red_color} G-{self.green_color} B-{self.blue_color} \n')
 
-    # this function will move the entity in its currently set direction (with 8 possible directions), if it hits the
-    # edge of the board it will then assign a new random direction to go in, this function also handles the time to
-    # move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
-    # the edge of the board or another entity
     def movement(self):
+        """
+        Will move the entity in its currently set direction (with 8 possible directions), if it hits the
+        edge of the board it will then assign a new random direction to go in, this function also handles the time to
+        move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
+        the edge of the board or another entity.
+        """
         if self.moving_life_form:
 
             # if the edge of the board is not hit and direction is '1' then move the entity up the X axis by 1,
@@ -179,9 +187,11 @@ class LifeForm(object):
                 self.time_to_move_count = self.time_to_move
                 self.direction = self.randomise_direction()
 
-    # when called this function with select a random new direction for the life form that is not the direction it is
-    # already going
     def randomise_direction(self, exclusion_list=None):
+        """
+        Select a random new direction for the life form that is not the direction it is
+        already going. It also allows for a list of previously attempted directions to be passed in and excluded.
+        """
         if exclusion_list is None:
             exclusion_list = []
         if self.direction not in exclusion_list:
@@ -193,18 +203,21 @@ class LifeForm(object):
             r = False
         return r
 
-    # this function counts down a life forms time to live from its full lifetime assigned to it when a life forms time
-    # to live hits zero remove it from the list of life forms and set the colours to 0, 0, 0
     def expire_entity(self):
+        """
+        Counts down a life forms time to live from its full lifetime assigned to it when a life forms time
+        to live hits zero return True for deletion of the life forms class from the holder.
+        """
         if self.time_to_live_count > 0:
             self.time_to_live_count -= 1
             return False
         elif self.time_to_live_count <= 0:
             return True
 
-    # function to call for erasing an entity from the board by fading it away as well as removing from the main list
-    # for life forms
     def fade_entity(self):
+        """
+        Erases an entity from the board by fading it away.
+        """
         for c in range(0, 255):
             if self.red_color > 0:
                 self.red_color -= 1
@@ -217,11 +230,12 @@ class LifeForm(object):
             unicorn.show()
         del holder[self.life_form_id]
 
-
-# draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
-# relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
-# amount of entities is rendered it moves to another layer in minecraft, essentially building upwards
 def draw_leds(x, y, r, g, b, current_layer):
+    """
+    Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
+    relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
+    amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
+    """
     unicorn.set_pixel(x, y, r, g, b)
     if minecraft_mode:
         player_x, player_y, player_z = mc.player.getPos()
@@ -231,35 +245,45 @@ def draw_leds(x, y, r, g, b, current_layer):
         mc.setBlock(player_x + x, player_y + 10 + current_layer, player_z + y, random_block)
 
 
-# clear the unicorn hat leds
 def clear_leds():
+    """
+    Clear Unicorn HAT LEDs.
+    """
     unicorn.clear()
 
-
-# function used for determining percentages of a whole number (deprecated)
 def percentage(percent, whole):
+    """
+    Determine percentage of a whole number (not currently in use)
+    """
     return int(round(percent * whole) / 100.0)
 
 
-# function used for generating a random number to be used as a seed, this is used to generate all 3 life seeds
-# resulting in 1.e+36 possible types of life form
 def get_random():
+    """
+    Generate a random number to be used as a seed, this is used to generate all 3 life seeds resulting in 1.e+36
+    possible types of life form.
+    """
     return random.randint(1, 1000000000000)
 
 
-# function to randomly kill half of the entities in existence on the board
 def thanos_snap():
+    """
+    Randomly kill half of the entities in existence on the board
+    """
     # loop for 50% of all existing entities choosing at random to eliminate
     for x in range(int(len(holder) / 2)):
         vanished = random.choice(holder)
+        # fade them away
         holder[vanished].fade_entity()
         time.sleep(0.1)
     logger.info("Perfectly balanced as all things should be")
     time.sleep(2)
 
 
-# function used to determine whether a life form is colliding with another currently on the board
 def collision_detector(life_form_id):
+    """
+    Determine whether a life form is colliding with another currently on the board.
+    """
     # get the board positions for the current life form
     life_form_id_x = holder[life_form_id].matrix_position_x
     life_form_id_y = holder[life_form_id].matrix_position_y
@@ -314,9 +338,11 @@ def collision_detector(life_form_id):
 
 
 def class_generator(life_form_id):
-    # assign all the life_form_ids into class instances for each life form for each life_form_id in the list of all
-    # life form life_form_ids assign a random x and y number for the position on the board and create the new life
-    # form with random seeds for each life seed generation
+    """
+    Assign all the life_form_ids into class instances for each life form for each life_form_id in the list of all
+    life form life_form_ids assign a random x and y number for the position on the board and create the new life
+    form with random seeds for each life seed generation.
+    """
     generated_class = {
         life_form_id: LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
                                start_x=board_position_generator(collision_detection=True)[0],
@@ -326,6 +352,10 @@ def class_generator(life_form_id):
 
 
 def board_position_generator(life_form_id=None, collision_detection=True, surrounding_area=False):
+    """
+    Get board positions for new entities, allows for collision detection, either choosing from across the whole board
+    or in the immediate area around a life form (determined by the life_form_id variable passed in).
+    """
     if surrounding_area:
         # get a list of all points around the entity
         positions_around_life_form = [
@@ -395,8 +425,10 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
             return post_x_gen, post_y_gen
 
 
-# for when a 50/50 chance needs to be calculated
 def fifty_fifty():
+    """
+    When a 50/50 chance needs to be calculated.
+    """
     if random.random() < .5:
         return True
     return False
@@ -405,9 +437,15 @@ def fifty_fifty():
 def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, random_dna_chance,
          highest_concurrent_lifeforms=0,
          current_layer=0):
+    """
+    Main loop where all life form movement and interaction takes place
+    """
+
+    # store the initial starting number so that if retries are enabled the same amount of entities can be generated
+    # again
     base_starting_number = len(holder)
 
-    # wrap main loop into a try: to catch keyboard exit
+    # wrap main loop into a try/catch to allow keyboard exit and cleanup
     try:
         while True:
 
