@@ -54,7 +54,7 @@ class LifeForm(object):
         self.blue_color = random.randint(1, 255)
         self.time_to_live = random.randint(0, self.max_life)
         self.time_to_live_count = self.time_to_live
-        self.moving_life_form_percent = random.randint(0, 100)
+        self.moving_life_form_percent = random.randint(1, 100)
         if self.moving_life_form_percent < static_chance:
             self.moving_life_form = False
             self.direction = 9
@@ -367,6 +367,8 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
             return post_x_gen, post_y_gen
 
     else:
+        post_x_gen = random.randint(0, 7)
+        post_y_gen = random.randint(0, 7)
 
         if collision_detection:
             x_list = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -374,11 +376,7 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
 
             random.shuffle(x_list)
             random.shuffle(y_list)
-            # todo: see if this is redundant
-            if not list(holder):
-                post_x_gen = random.randint(0, 7)
-                post_y_gen = random.randint(0, 7)
-                return post_x_gen, post_y_gen
+
             try:
                 for item in list(holder):
                     s_item_x = holder[item].matrix_position_x
@@ -390,14 +388,10 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
                                 post_y_gen = y
                                 return post_x_gen, post_y_gen
             except NameError:
-                post_x_gen = random.randint(0, 7)
-                post_y_gen = random.randint(0, 7)
                 return post_x_gen, post_y_gen
-            return None
+            return post_x_gen, post_y_gen
 
         else:
-            post_x_gen = random.randint(0, 7)
-            post_y_gen = random.randint(0, 7)
             return post_x_gen, post_y_gen
 
 
@@ -500,24 +494,24 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
 
                                     for key, values in dna_transfer_capsule.items():
 
-                                        dna_chaos = random.randint(0, 100)
+                                        dna_chaos = random.randint(1, 100)
                                         if dna_chaos <= random_dna_chance:
                                             dna_transfer_capsule[key] = get_random()
                                         else:
                                             if key == 'transfer_dna_1':
-                                                dna_parent = random.randint(0, 100)
+                                                dna_parent = random.randint(1, 100)
                                                 if dna_parent <= 50:
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed1
                                                 else:
                                                     dna_transfer_capsule[key] = holder[collision_detected].life_seed1
                                             elif key == 'transfer_dna_2':
-                                                dna_parent = random.randint(0, 100)
+                                                dna_parent = random.randint(1, 100)
                                                 if dna_parent <= 50:
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed2
                                                 else:
                                                     dna_transfer_capsule[key] = holder[collision_detected].life_seed2
                                             elif key == 'transfer_dna_3':
-                                                dna_parent = random.randint(0, 100)
+                                                dna_parent = random.randint(1, 100)
                                                 if dna_parent <= 50:
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed3
                                                 else:
