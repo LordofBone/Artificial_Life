@@ -239,7 +239,7 @@ def draw_leds(x, y, r, g, b, current_layer):
     amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
     """
     unicorn.set_pixel(x, y, r, g, b)
-    if minecraft_mode:
+    if args.mc_mode:
         player_x, player_y, player_z = mc.player.getPos()
         random.seed(r + g + b)
         random_block = random.randint(1, 22)
@@ -292,16 +292,17 @@ def collision_detector(life_form_id):
     life_form_id_y = holder[life_form_id].matrix_position_y
     life_form_id_direction = holder[life_form_id].direction
 
-    # for every item in the list of board positions perform a loop
+    # for every life form on the board loop through
     for item in list(holder):
         # split the items in the sub-list into separate variables for comparison
         s_item_life_form_id = item
 
+        # get locations of the current entity
         s_item_x = holder[s_item_life_form_id].matrix_position_x
         s_item_y = holder[s_item_life_form_id].matrix_position_y
 
-        # if the x and y positions match that of a life form that is currently on the position list then return the
-        # life_form_id of the life form it collided with
+        # using the direction of the current life form determine on next move if the life form were to collide with
+        # another, if so return the id of the other life form
         if life_form_id_direction == 1:
             if life_form_id_x + 1 == s_item_x and life_form_id_y == s_item_y:
                 return s_item_life_form_id
@@ -334,6 +335,7 @@ def collision_detector(life_form_id):
             if life_form_id_x + 1 == s_item_x and life_form_id_y - 1 == s_item_y:
                 return s_item_life_form_id
 
+        # if direction is 9 then the life form is not moving and therefore is not going to collide with anything
         elif life_form_id_direction == 9:
             return False
 
@@ -371,6 +373,7 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
             [holder[life_form_id].matrix_position_x, holder[life_form_id].matrix_position_y - 1],
             [holder[life_form_id].matrix_position_x + 1, holder[life_form_id].matrix_position_y - 1]]
 
+        # check area around entity for other life forms using above list
         if collision_detection:
             for item in list(holder):
                 s_item_x = holder[item].matrix_position_x
@@ -381,18 +384,20 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
                         post_x_gen = pos[0]
                         post_y_gen = pos[1]
 
+                        # if free space found is outside the board try another location
                         if post_x_gen > u_height_max or post_x_gen < 0:
                             continue
-
                         if post_y_gen > u_width_max or post_y_gen < 0:
                             continue
 
                         logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
 
+                        # if no other entity is in this location return the co-ords
                         return post_x_gen, post_y_gen
-
+            # if no free space is found return None
             return None
         else:
+            # with no collision detection enabled just choose a random spot
             positions = random.choice(positions_around_life_form)
             post_x_gen = positions[0]
             post_y_gen = positions[1]
@@ -400,16 +405,21 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
             return post_x_gen, post_y_gen
 
     else:
+        # if surrounding area of entity not enabled then choose from anywhere on the board
         post_x_gen = random.randint(0, 7)
         post_y_gen = random.randint(0, 7)
 
+        # with collision detection determine if a spot on the board contains a life form
         if collision_detection:
+            # assemble lists of possible x and y positions
             x_list = [0, 1, 2, 3, 4, 5, 6, 7]
             y_list = [0, 1, 2, 3, 4, 5, 6, 7]
 
+            # shuffle them so they can be iterated through randomly
             random.shuffle(x_list)
             random.shuffle(y_list)
 
+            # loop through all entity classes to determine locations
             try:
                 for item in list(holder):
                     s_item_x = holder[item].matrix_position_x
@@ -417,13 +427,18 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
                     for x in x_list:
                         for y in y_list:
                             if not x == s_item_x and not y == s_item_y:
+                                # if this location on the board does not contain an entity replace the previously
+                                # randomly generated co-ords with the currently selected position and return them
                                 post_x_gen = x
                                 post_y_gen = y
                                 return post_x_gen, post_y_gen
+            # if this is the first entity being created then return random positions as there is nothing to loop
+            # through and therefore nothing on the board to collide with
             except NameError:
                 return post_x_gen, post_y_gen
+            # if all else fails just return the previously generated random x, y co-ords
             return post_x_gen, post_y_gen
-
+        # if no collision detection just return random x, y co-ords
         else:
             return post_x_gen, post_y_gen
 
@@ -452,7 +467,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
     try:
         while True:
 
-            # clear unicorn hat leds and clear position list
+            # clear unicorn hat leds unless draw_trails is True
             if not draw_trails:
                 clear_leds()
 
@@ -476,7 +491,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                         continue
 
                     # check for any collisions with any other entities and return the life_form_id of an entity
-                    # collided with if so
+                    # collided with
                     collision_detected = collision_detector(life_form_id=life_form_id)
                     # get the count of total life forms currently active
                     current_life_form_amount = len(holder)
@@ -497,10 +512,11 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
 
                         collision_detected_again = collision_detector(life_form_id=life_form_id)
 
+                        # storing previously attempted directions so that the same direction is not tried again
                         attempted_directions.append(direction_attempt)
 
-                        # find a new direction until a free space is found, 9 attempts are made then the entity will
-                        # sit still until it changes direction again
+                        # find a new direction until a free space is found, if nowhere around the life form is clear
+                        # it will go to a still state until it attempts to change direction again
                         while collision_detected_again:
                             collision_detected_again = collision_detector(life_form_id=life_form_id)
 
@@ -513,15 +529,16 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
 
                             attempted_directions.append(direction_attempt)
 
-                        # if the aggression factor is below 850 the life form will attempt to breed with the one it
-                        # collided with
+                        # if the aggression factor is below the configured threshold the life form will attempt to
+                        # breed with the one it collided with
                         if holder[life_form_id].aggression_factor < breed_threshold:
+                            # the other entity also needs to have its aggression factor below the breed threshold
                             if holder[collision_detected].aggression_factor < breed_threshold:
                                 # the breeding will attempt only if the current life form count is not above the
                                 # population limit
                                 if current_life_form_amount < concurrent_lifeforms_max:
 
-                                    # generate 2 random numbers for x and y positions of the new entity
+                                    # find a place for the new entity to spawn around the current parent life form
                                     try:
                                         post_x_gen, post_y_gen = board_position_generator(surrounding_area=True,
                                                                                           collision_detection=True,
@@ -534,9 +551,9 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                                     life_form_total_count += 1
 
                                     # the below assigns all 3 life seeds with the potential to take the life seed
-                                    # from either parent (40% chance each), or whether a new random life seed will
-                                    # be inserted (20% chance), resulting in some genetic chaos to change
-                                    # offspring randomly
+                                    # from either parent (50% chance each), or whether a new random life seed will be
+                                    # inserted (chance determined by parameter), resulting in some genetic chaos to
+                                    # change offspring randomly
                                     dna_transfer_capsule = {'transfer_dna_1': 0, 'transfer_dna_2': 0,
                                                             'transfer_dna_3': 0}
 
@@ -582,6 +599,9 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                                 elif current_life_form_amount >= concurrent_lifeforms_max:
                                     logger.debug(f"Max life form limit: {concurrent_lifeforms_max} reached")
                             else:
+                                # if the life form has bumped into another life form that is above the breed
+                                # threshold, the other life form will now start moving in the same direction as the
+                                # current life form
                                 holder[collision_detected].direction = holder[life_form_id].direction
 
                         # if the entities' aggression factor is above 850 it will attempt to kill the entity it has 
@@ -612,19 +632,17 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                             elif holder[collision_detected].aggression_factor == holder[life_form_id].aggression_factor:
                                 logger.debug('Neither entity killed')
 
-                    # call the movement function for the life form
                     holder[life_form_id].movement()
 
                     holder[life_form_id].get_stats()
 
-                    # call function to draw leds with the current life forms x and y and r g b data, as well as the
-                    # current layer
                     draw_leds(holder[life_form_id].matrix_position_x, holder[life_form_id].matrix_position_y,
                               holder[life_form_id].red_color, holder[life_form_id].green_color,
                               holder[life_form_id].blue_color, current_layer)
 
             # if the main list of entities is empty then all have expired; the program displays final information 
-            # about the programs run and exits 
+            # about the programs run and exits; unless retry mode is active, then a new set of entities are created
+            # and the simulation starts fresh with the same initial configuration
             elif not holder:
                 if retries:
                     highest_concurrent_lifeforms = 0
@@ -634,9 +652,7 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                         holder.update(class_generator(n))
 
                     continue
-
                 else:
-
                     logger.info(
                         f'\n All Lifeforms have expired.\n Total life forms produced: {life_form_total_count}\n Max '
                         f'concurrent Lifeforms was: {highest_concurrent_lifeforms}\n')
@@ -644,10 +660,8 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
 
             logger.debug(f"Lifeforms: {life_form_total_count}")
 
-            # show leds
             unicorn.show()
 
-            # time to sleep before next loop iteration, controlled from argument above
             time.sleep(args.loop_speed)
 
     # upon keyboard interrupt display information about the program run before exiting
@@ -709,13 +723,14 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    minecraft_mode = args.mc_mode
-    if minecraft_mode:
+    # setup Minecraft connection if mc_mode is True
+    if args.mc_mode:
         mc = Minecraft.create()
         mc.postToChat("PiLife Plugged into Minecraft!")
 
     holder = {}
 
+    # generate life form classes
     for i in range(args.life_form_total):
         holder.update(class_generator(i))
 
