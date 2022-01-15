@@ -24,9 +24,8 @@ u_height_max = u_height - 1
 
 class LifeForm(object):
     """
-    The main class that handles each life forms initialisation, movement, colour, expiry and statistics
+    The main class that handles each life forms initialisation, movement, colour, expiry and statistics.
     """
-
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
         """
         When class initialised it gives the life form its properties from the random numbers inserted into it,
