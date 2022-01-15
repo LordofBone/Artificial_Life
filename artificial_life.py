@@ -505,11 +505,23 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                                             dna_transfer_capsule[key] = get_random()
                                         else:
                                             if key == 'transfer_dna_1':
-                                                dna_transfer_capsule[key] = holder[life_form_id].life_seed1
+                                                dna_parent = random.randint(0, 100)
+                                                if dna_parent <= 50:
+                                                    dna_transfer_capsule[key] = holder[life_form_id].life_seed1
+                                                else:
+                                                    dna_transfer_capsule[key] = holder[collision_detected].life_seed1
                                             elif key == 'transfer_dna_2':
-                                                dna_transfer_capsule[key] = holder[life_form_id].life_seed2
+                                                dna_parent = random.randint(0, 100)
+                                                if dna_parent <= 50:
+                                                    dna_transfer_capsule[key] = holder[life_form_id].life_seed2
+                                                else:
+                                                    dna_transfer_capsule[key] = holder[collision_detected].life_seed2
                                             elif key == 'transfer_dna_3':
-                                                dna_transfer_capsule[key] = holder[life_form_id].life_seed3
+                                                dna_parent = random.randint(0, 100)
+                                                if dna_parent <= 50:
+                                                    dna_transfer_capsule[key] = holder[life_form_id].life_seed3
+                                                else:
+                                                    dna_transfer_capsule[key] = holder[collision_detected].life_seed3
 
                                     h_update = {life_form_total_count: LifeForm(life_form_id=life_form_total_count,
                                                                                 seed=dna_transfer_capsule[
