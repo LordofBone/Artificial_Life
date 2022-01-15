@@ -7,13 +7,13 @@ import unicornhat as unicorn
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
-    logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move
+    logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness
 
 logger = logging.getLogger("alife-logger")
 
 # unicorn hat setup
 unicorn.set_layout(unicorn.AUTO)
-unicorn.brightness(0.3)
+unicorn.brightness(led_brightness)
 unicorn.rotation(0)
 u_width, u_height = unicorn.get_shape()
 
