@@ -78,9 +78,10 @@ Arguments that can be passed:
                         Enables Minecraft mode
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
                         of entities
+  -g, --gravity         Gravity enabled, still entities will fall to the floor
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
-  -uhm, --unicorn-hat-mini
+  -hm {SD,HD,MINI}, --hat-model {SD,HD,MINI}
                         Whether the program is using a Unicorn Mini HAT
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
