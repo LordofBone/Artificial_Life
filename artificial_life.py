@@ -98,7 +98,6 @@ class LifeForm(object):
         the edge of the board or another entity.
         """
         if self.moving_life_form:
-
             # if the edge of the board is not hit and direction is '1' then move the entity up the X axis by 1,
             # if it has hit the edge of the board its direction is randomised by the "randomise direction" function
             # being called for the entity
@@ -111,7 +110,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '2' then move the entity down the X axis by 1,
             # if it has hit the edge of the board its direction is randomised by the "randomise direction" function
             # being called for the entity
-            if self.direction == 2:
+            elif self.direction == 2:
                 if self.matrix_position_x > 0:
                     self.matrix_position_x -= 1
                 else:
@@ -120,7 +119,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '3' then move the entity up the Y axis by 1,
             # if it has hit the edge of the board its direction is randomised by the "randomise direction" function
             # being called for the entity
-            if self.direction == 3:
+            elif self.direction == 3:
                 if self.matrix_position_y < u_height_max:
                     self.matrix_position_y += 1
                 else:
@@ -129,7 +128,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '4' then move the entity down the Y axis by 1,
             # if it has hit the edge of the board its direction is randomised by the "randomise direction" function
             # being called for the entity
-            if self.direction == 4:
+            elif self.direction == 4:
                 if self.matrix_position_y > 0:
                     self.matrix_position_y -= 1
                 else:
@@ -138,7 +137,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '5' then move the entity up the X and Y axis by 1,
             # if it has hit the edge of the board its direction is randomised by the "randomise direction" function
             # being called for the entity
-            if self.direction == 5:
+            elif self.direction == 5:
                 if self.matrix_position_x < u_width_max and self.matrix_position_y < u_height_max:
                     self.matrix_position_x += 1
                     self.matrix_position_y += 1
@@ -148,7 +147,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '6' then move the entity down the X and Y axis by
             # 1, if it has hit the edge of the board its direction is randomised by the "randomise direction"
             # function being called for the entity
-            if self.direction == 6:
+            elif self.direction == 6:
                 if self.matrix_position_x > 0 and self.matrix_position_y > 0:
                     self.matrix_position_x -= 1
                     self.matrix_position_y -= 1
@@ -158,7 +157,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '7' then move the entity down the X axis and up Y
             # axis by 1, if it has hit the edge of the board its direction is randomised by the "randomise direction"
             # function being called for the entity
-            if self.direction == 7:
+            elif self.direction == 7:
                 if self.matrix_position_y < u_height_max and self.matrix_position_x > 0:
                     self.matrix_position_x -= 1
                     self.matrix_position_y += 1
@@ -168,7 +167,7 @@ class LifeForm(object):
             # if the edge of the board is not hit and direction is '8' then move the entity up the X axis and down Y
             # axis by 1, if it has hit the edge of the board its direction is randomised by the "randomise direction"
             # function being called for the entity
-            if self.direction == 8:
+            elif self.direction == 8:
                 if self.matrix_position_y > 0 and self.matrix_position_x < u_width_max:
                     self.matrix_position_x += 1
                     self.matrix_position_y -= 1
@@ -373,10 +372,10 @@ def class_generator(life_form_id):
     life form life_form_ids assign a random x and y number for the position on the board and create the new life
     form with random seeds for each life seed generation.
     """
+    starting_x, starting_y = board_position_generator(collision_detection=True)
     generated_class = {
         life_form_id: LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
-                               start_x=board_position_generator(collision_detection=True)[0],
-                               start_y=board_position_generator(collision_detection=True)[1])}
+                               start_x=starting_x, start_y=starting_y)}
 
     return generated_class
 
@@ -410,13 +409,12 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
                         post_y_gen = pos[1]
 
                         # if free space found is outside the board try another location
-                        if post_x_gen > u_height_max or post_x_gen < 0:
+                        if post_x_gen > u_width_max or post_x_gen < 0:
                             continue
-                        if post_y_gen > u_width_max or post_y_gen < 0:
+                        if post_y_gen > u_height_max or post_y_gen < 0:
                             continue
 
                         logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
-
                         # if no other entity is in this location return the co-ords
                         return post_x_gen, post_y_gen
             # if no free space is found return None
@@ -431,14 +429,21 @@ def board_position_generator(life_form_id=None, collision_detection=True, surrou
 
     else:
         # if surrounding area of entity not enabled then choose from anywhere on the board
-        post_x_gen = random.randint(0, 7)
-        post_y_gen = random.randint(0, 7)
+        post_x_gen = random.randint(0, u_width_max)
+        post_y_gen = random.randint(0, u_height_max)
 
         # with collision detection determine if a spot on the board contains a life form
         if collision_detection:
             # assemble lists of possible x and y positions
-            x_list = [0, 1, 2, 3, 4, 5, 6, 7]
-            y_list = [0, 1, 2, 3, 4, 5, 6, 7]
+            x_list = []
+            y_list = []
+
+            # generate the lists dynamically from the raw width and height of the board to ensure the lists are
+            # zero-indexed which is what is required for the LED drawing x, y positions
+            for x_position in range(u_width):
+                x_list.append(x_position)
+            for y_position in range(u_height):
+                y_list.append(y_position)
 
             # shuffle them so they can be iterated through randomly
             random.shuffle(x_list)
@@ -603,20 +608,17 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                                             dna_transfer_capsule[key] = get_random()
                                         else:
                                             if key == 'transfer_dna_1':
-                                                dna_parent = fifty_fifty()
-                                                if dna_parent:
+                                                if fifty_fifty():
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed1
                                                 else:
                                                     dna_transfer_capsule[key] = holder[collision_detected].life_seed1
                                             elif key == 'transfer_dna_2':
-                                                dna_parent = fifty_fifty()
-                                                if dna_parent:
+                                                if fifty_fifty():
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed2
                                                 else:
                                                     dna_transfer_capsule[key] = holder[collision_detected].life_seed2
                                             elif key == 'transfer_dna_3':
-                                                dna_parent = fifty_fifty()
-                                                if dna_parent:
+                                                if fifty_fifty():
                                                     dna_transfer_capsule[key] = holder[life_form_id].life_seed3
                                                 else:
                                                     dna_transfer_capsule[key] = holder[collision_detected].life_seed3
@@ -795,30 +797,22 @@ if __name__ == '__main__':
         unicorn = UnicornHATMini()
         unicorn.set_brightness(led_brightness)
         unicorn.set_rotation(0)
-        u_width, u_height = unicorn.get_shape()
-        # the unicorn hat led addresses are 0 indexed so need to account for this, there appears to be some weird bug
-        # with the unicorn hat mini code that requires width to be offset by 2 but height by 1
-        u_width_max = u_width - 2
-        u_height_max = u_height - 1
     elif args.hat_edition == "SD":
         # unicorn hat + unicorn hat hd setup
         unicorn.set_layout(unicorn.AUTO)
         unicorn.brightness(led_brightness)
         unicorn.rotation(0)
-        u_width, u_height = unicorn.get_shape()
-        # the unicorn hat led addresses are 0 indexed so need to account for this
-        u_width_max = u_width - 1
-        u_height_max = u_height - 1
     elif args.hat_edition == "HD":
         # unicorn hat + unicorn hat hd setup
         unicorn = unicornhd
         unicorn.set_layout(unicorn.AUTO)
         unicorn.brightness(led_brightness)
         unicorn.rotation(0)
-        u_width, u_height = unicorn.get_shape()
-        # the unicorn hat led addresses are 0 indexed so need to account for this
-        u_width_max = u_width - 1
-        u_height_max = u_height - 1
+
+    u_width, u_height = unicorn.get_shape()
+    # the unicorn hat led addresses are 0 indexed so need to account for this
+    u_width_max = u_width - 1
+    u_height_max = u_height - 1
 
     # setup Minecraft connection if mc_mode is True
     if args.mc_mode:
