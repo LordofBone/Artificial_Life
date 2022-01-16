@@ -797,7 +797,7 @@ if __name__ == '__main__':
         unicorn.set_rotation(0)
         u_width, u_height = unicorn.get_shape()
         # the unicorn hat led addresses are 0 indexed so need to account for this, there appears to be some weird bug
-        # with the unicorn hat mini code that requires width to be offset by 2 but height by nothing
+        # with the unicorn hat mini code that requires width to be offset by 2 but height by 1
         u_width_max = u_width - 2
         u_height_max = u_height - 1
     elif args.hat_edition == "SD":
