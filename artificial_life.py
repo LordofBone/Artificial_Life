@@ -59,7 +59,7 @@ class LifeForm(object):
         self.time_to_live = random.randint(0, self.max_life)
         self.time_to_live_count = self.time_to_live
         self.moving_life_form_percent = random.randint(1, 100)
-        if self.moving_life_form_percent < args.static_entity:
+        if self.moving_life_form_percent <= args.static_entity:
             self.moving_life_form = False
             self.direction = 9
         else:
