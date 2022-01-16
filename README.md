@@ -28,6 +28,12 @@ A more detailed set of instructions is available on the blog post for this proje
 Install and setup the Unicorn HAT:
 https://github.com/pimoroni/unicorn-hat
 
+You can also use this with the Unicorn HAT Mini:
+https://learn.pimoroni.com/article/getting-started-with-unicorn-hat-mini
+
+Or even the Unicorn HAT HD:
+https://github.com/pimoroni/unicorn-hat-hd
+
 sudo pip install -r requirements.txt
 
 ```
@@ -74,6 +80,8 @@ Arguments that can be passed:
                         of entities
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
+  -uhm, --unicorn-hat-mini
+                        Whether the program is using a Unicorn Mini HAT
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
 ```

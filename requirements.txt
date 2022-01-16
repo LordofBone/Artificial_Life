@@ -1,2 +1,4 @@
 unicornhat
+unicornhatmini
+unicornhathd
 mcpi

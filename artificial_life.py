@@ -4,6 +4,8 @@ import random
 import time
 
 import unicornhat as unicorn
+from unicornhatmini import UnicornHATMini
+
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
@@ -11,16 +13,6 @@ from config.parameters import initial_lifeforms_count, speed, population_limit, 
     combine_threshold
 
 logger = logging.getLogger("alife-logger")
-
-# unicorn hat setup
-unicorn.set_layout(unicorn.AUTO)
-unicorn.brightness(led_brightness)
-unicorn.rotation(0)
-u_width, u_height = unicorn.get_shape()
-
-# the unicorn hat led addresses are 0 indexed so need to account for this
-u_width_max = u_width - 1
-u_height_max = u_height - 1
 
 
 class LifeForm(object):
@@ -214,7 +206,7 @@ class LifeForm(object):
         if self.direction not in exclusion_list:
             exclusion_list.append(self.direction)
         try:
-            r = random.choice([d for d in range(1, 9) if i not in exclusion_list])
+            r = random.choice([d for d in range(1, 9) if d not in exclusion_list])
             self.direction = r
         except IndexError:
             r = False
@@ -258,7 +250,10 @@ def draw_leds(x, y, r, g, b, current_layer):
     relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
     amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
     """
-    unicorn.set_pixel(x, y, r, g, b)
+    try:
+        unicorn.set_pixel(x, y, r, g, b)
+    except IndexError:
+        raise Exception(f"Set pixel did not like X:{x} Y:{y} R:{r} G:{g} B:{b}")
     if args.mc_mode:
         player_x, player_y, player_z = mc.player.getPos()
         random.seed(r + g + b)
@@ -548,6 +543,9 @@ def main(concurrent_lifeforms_max, life_form_total_count, draw_trails, retries, 
                         # find a new direction until a free space is found, if nowhere around the life form is clear
                         # it will go to a still state until it attempts to change direction again
                         while collision_detected_again:
+                            logger.debug(
+                                f'Collision detected again: {life_form_id} collided with {collision_detected_again}, '
+                                f'with previously tried directions: {attempted_directions}')
                             collision_detected_again = collision_detector(life_form_id=life_form_id)
 
                             direction_attempt = holder[life_form_id].randomise_direction(
@@ -769,12 +767,35 @@ if __name__ == '__main__':
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
 
+    parser.add_argument('-uhm', '--unicorn-hat-mini', action="store_true", dest="unicorn_mini",
+                        help='Whether the program is using a Unicorn Mini HAT')
+
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
 
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level)
+
+    if args.unicorn_mini:
+        # unicorn hat mini setup
+        unicorn = UnicornHATMini()
+        unicorn.set_brightness(led_brightness)
+        unicorn.set_rotation(0)
+        u_width, u_height = unicorn.get_shape()
+        # the unicorn hat led addresses are 0 indexed so need to account for this, there appears to be some weird bug
+        # with the unicorn hat mini code that requires width to be offset by 2 but height by nothing
+        u_width_max = u_width - 2
+        u_height_max = u_height
+    else:
+        # unicorn hat + unicorn hat hd setup
+        unicorn.set_layout(unicorn.AUTO)
+        unicorn.brightness(led_brightness)
+        unicorn.rotation(0)
+        u_width, u_height = unicorn.get_shape()
+        # the unicorn hat led addresses are 0 indexed so need to account for this
+        u_width_max = u_width - 1
+        u_height_max = u_height - 1
 
     # setup Minecraft connection if mc_mode is True
     if args.mc_mode:
