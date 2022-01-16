@@ -177,7 +177,11 @@ class LifeForm(object):
 
             # if the direction is '9' do not move the entity
             elif self.direction == 9:
-                pass
+                if args.gravity:
+                    if self.matrix_position_y < u_height_max:
+                        self.matrix_position_y += 1
+                else:
+                    pass
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change direction from
             # the "randomise direction" function being called
@@ -196,6 +200,10 @@ class LifeForm(object):
                 except KeyError:
                     self.linked_up = False
                     self.direction = self.randomise_direction()
+
+        elif args.gravity:
+            if self.matrix_position_y < u_height_max:
+                self.matrix_position_y += 1
 
     def randomise_direction(self, exclusion_list=None):
         """
@@ -766,6 +774,9 @@ if __name__ == '__main__':
     parser.add_argument('-tr', '--trails', action="store_true", dest="trails_on",
                         help='Stops the HAT from being cleared, resulting in trails of entities')
 
+    parser.add_argument('-g', '--gravity', action="store_true", dest="gravity",
+                        help='Gravity enabled, still entities will fall to the floor')
+
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
 
@@ -788,7 +799,7 @@ if __name__ == '__main__':
         # the unicorn hat led addresses are 0 indexed so need to account for this, there appears to be some weird bug
         # with the unicorn hat mini code that requires width to be offset by 2 but height by nothing
         u_width_max = u_width - 2
-        u_height_max = u_height
+        u_height_max = u_height - 1
     elif args.hat_edition == "SD":
         # unicorn hat + unicorn hat hd setup
         unicorn.set_layout(unicorn.AUTO)
