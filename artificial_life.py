@@ -4,13 +4,14 @@ import random
 import time
 
 import unicornhat as unicorn
+import unicornhathd as unicornhd
 from unicornhatmini import UnicornHATMini
 
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
     logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
-    combine_threshold
+    combine_threshold, hat_model
 
 logger = logging.getLogger("alife-logger")
 
@@ -254,6 +255,7 @@ def draw_leds(x, y, r, g, b, current_layer):
         unicorn.set_pixel(x, y, r, g, b)
     except IndexError:
         raise Exception(f"Set pixel did not like X:{x} Y:{y} R:{r} G:{g} B:{b}")
+    # todo: improve this greatly
     if args.mc_mode:
         player_x, player_y, player_z = mc.player.getPos()
         random.seed(r + g + b)
@@ -767,8 +769,8 @@ if __name__ == '__main__':
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
 
-    parser.add_argument('-uhm', '--unicorn-hat-mini', action="store_true", dest="unicorn_mini",
-                        help='Whether the program is using a Unicorn Mini HAT')
+    parser.add_argument('-hm', '--hat-model', action="store", dest="hat_edition", type=str, default=hat_model,
+                        choices=['SD', 'HD', 'MINI'], help='Whether the program is using a Unicorn Mini HAT')
 
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
@@ -777,7 +779,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    if args.unicorn_mini:
+    if args.hat_edition == "MINI":
         # unicorn hat mini setup
         unicorn = UnicornHATMini()
         unicorn.set_brightness(led_brightness)
@@ -787,8 +789,18 @@ if __name__ == '__main__':
         # with the unicorn hat mini code that requires width to be offset by 2 but height by nothing
         u_width_max = u_width - 2
         u_height_max = u_height
-    else:
+    elif args.hat_edition == "SD":
         # unicorn hat + unicorn hat hd setup
+        unicorn.set_layout(unicorn.AUTO)
+        unicorn.brightness(led_brightness)
+        unicorn.rotation(0)
+        u_width, u_height = unicorn.get_shape()
+        # the unicorn hat led addresses are 0 indexed so need to account for this
+        u_width_max = u_width - 1
+        u_height_max = u_height - 1
+    elif args.hat_edition == "HD":
+        # unicorn hat + unicorn hat hd setup
+        unicorn = unicornhd
         unicorn.set_layout(unicorn.AUTO)
         unicorn.brightness(led_brightness)
         unicorn.rotation(0)
