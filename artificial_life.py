@@ -329,6 +329,7 @@ class LifeForm:
     def still(self):
         if args.gravity:
             self.direction = 'move_down'
+            return True
 
     def movement(self):
         """
