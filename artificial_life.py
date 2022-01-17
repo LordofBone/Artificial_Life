@@ -389,6 +389,9 @@ class LifeForm:
         return r
 
     def linked(self, life_form_id):
+        """
+        Link the life form to another, to ensure that they try to move in the same direction.
+        """
         self.linked_up = True
         self.linked_to = life_form_id
 
@@ -428,6 +431,7 @@ class LifeForm:
                                            self.get_position_up_and_left(), self.get_position_down_and_left(),
                                            self.get_position_down_and_right()]
 
+        # shuffle the position list to prevent the same directions being favoured each time
         random.shuffle(self.positions_around_life_form)
 
     def board_position_generator(self, collision_detection=True, surrounding_area=False):
@@ -508,7 +512,6 @@ class LifeForm:
         """
         Determine whether a life form is colliding with another currently on the board.
         """
-
         # check to see if the life form has reached the edge of the board vs its direction
         if self.direction == 'move_right':
             if self.get_position_right()[0] > u_width_max:
@@ -722,6 +725,7 @@ def main():
 
                     holder[life_form_id].get_stats()
 
+                    # some debug-like code to identify when a life form goes outside the LED board
                     if holder[life_form_id].matrix_position_x < 0 or holder[
                         life_form_id].matrix_position_x > u_width_max:
                         raise Exception("Life form has exceeded x axis")
@@ -747,8 +751,9 @@ def main():
                     continue
                 else:
                     logger.info(
-                        f'\n All Lifeforms have expired.\n Total life forms produced: {current_session.life_form_total_count}\n Max '
-                        f'concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
+                        f'\n All Lifeforms have expired.\n Total life forms produced: '
+                        f'{current_session.life_form_total_count}\n '
+                        f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
                     break
 
             logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
