@@ -427,6 +427,8 @@ class LifeForm:
                                            self.get_position_up_and_left(), self.get_position_down_and_left(),
                                            self.get_position_down_and_right()]
 
+        random.shuffle(self.positions_around_life_form)
+
     def board_position_generator(self, collision_detection=True, surrounding_area=False):
         """
         Get board positions for new entities, allows for collision detection, either choosing from across the whole
