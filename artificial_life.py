@@ -264,6 +264,7 @@ class LifeForm:
         logger.debug(f'Aggression Factor: {self.aggression_factor}')
         logger.debug(f'Position X: {self.matrix_position_x}')
         logger.debug(f'Position Y: {self.matrix_position_y}')
+        logger.debug(f'Surrounding positions: {self.positions_around_life_form}')
         logger.debug(f'Color: R-{self.red_color} G-{self.green_color} B-{self.blue_color} \n')
 
     def get_position_up(self):
