@@ -23,9 +23,7 @@ A more detailed set of instructions is available on the blog post for this proje
 2. Clone the repository
 3. Install the dependencies
 
-```
-
-Install and setup the Unicorn HAT:
+Install and set up the Unicorn HAT:
 [Unicorn HAT GitHub code](https://github.com/pimoroni/unicorn-hat)
 
 You can also use this with the Unicorn HAT Mini:
@@ -33,6 +31,8 @@ You can also use this with the Unicorn HAT Mini:
 
 Or even the Unicorn HAT HD:
 [Unicorn HAT HD GitHub code](https://github.com/pimoroni/unicorn-hat-hd)
+
+```
 
 sudo pip install -r requirements.txt
 
