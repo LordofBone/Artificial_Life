@@ -26,13 +26,13 @@ A more detailed set of instructions is available on the blog post for this proje
 ```
 
 Install and setup the Unicorn HAT:
-https://github.com/pimoroni/unicorn-hat
+[Unicorn HAT GitHub code](https://github.com/pimoroni/unicorn-hat)
 
 You can also use this with the Unicorn HAT Mini:
-https://learn.pimoroni.com/article/getting-started-with-unicorn-hat-mini
+[Unicorn HAT Mini GitHub code](https://learn.pimoroni.com/article/getting-started-with-unicorn-hat-mini)
 
 Or even the Unicorn HAT HD:
-https://github.com/pimoroni/unicorn-hat-hd
+[Unicorn HAT HD GitHub code](https://github.com/pimoroni/unicorn-hat-hd)
 
 sudo pip install -r requirements.txt
 
@@ -41,6 +41,8 @@ sudo pip install -r requirements.txt
 ### Running The Program
 
 Run the program from the command line - for some reason I have found that it requires sudo to work with the HAT.
+It will default to use the original Unicorn HAT, but if you add in the parameter '-uh' you can then specify between
+SD, HD or MINI.
 
 ```
 
