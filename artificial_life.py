@@ -472,12 +472,11 @@ class LifeForm:
                 return post_x_gen, post_y_gen
 
         else:
-            # if surrounding area of entity not enabled then choose from anywhere on the board
-            post_x_gen = random.randint(0, u_width_max)
-            post_y_gen = random.randint(0, u_height_max)
-
             # with collision detection determine if a spot on the board contains a life form
             if collision_detection:
+                post_x_gen = None
+                post_y_gen = None
+
                 # get lists of possible x and y positions to be shuffled
                 x_list = source_x_list
                 y_list = source_y_list
@@ -489,24 +488,29 @@ class LifeForm:
                 # loop through all entity classes to determine locations
                 try:
                     for item in list(holder):
+
                         s_item_x = holder[item].matrix_position_x
                         s_item_y = holder[item].matrix_position_y
+                        # if this location on the board does not contain an entity replace the previously
+                        # randomly generated co-ords with the currently selected position and return them
                         for x in x_list:
-                            for y in y_list:
-                                if not x == s_item_x and not y == s_item_y:
-                                    # if this location on the board does not contain an entity replace the previously
-                                    # randomly generated co-ords with the currently selected position and return them
-                                    post_x_gen = x
-                                    post_y_gen = y
-                                    return post_x_gen, post_y_gen
+                            if not x == s_item_x:
+                                post_x_gen = x
+                        for y in y_list:
+                            if not y == s_item_y:
+                                post_y_gen = y
                 # if this is the first entity being created then return random positions as there is nothing to loop
                 # through and therefore nothing on the board to collide with
                 except NameError:
                     return post_x_gen, post_y_gen
-                # if all else fails just return the previously generated random x, y co-ords
+                # return None if no free spaces are available
                 return post_x_gen, post_y_gen
             # if no collision detection just return random x, y co-ords
             else:
+                # if collision detection not enabled then choose from anywhere on the board
+                post_x_gen = random.randint(0, u_width_max)
+                post_y_gen = random.randint(0, u_height_max)
+
                 return post_x_gen, post_y_gen
 
     def collision_detector(self):
@@ -644,6 +648,7 @@ def class_generator(life_form_id):
     life form life_form_ids assign a random x and y number for the position on the board and create the new life
     form with random seeds for each life seed generation.
     """
+    # todo: figure out why the whole board will not fill
     if not holder:
         starting_x = random.randint(0, u_width_max)
         starting_y = random.randint(0, u_height_max)
