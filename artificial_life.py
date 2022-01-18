@@ -142,7 +142,7 @@ class LifeForm:
                 if holder[self.life_form_id].aggression_factor < breed_threshold:
                     # the other entity also needs to have its aggression factor below the breed threshold
                     if holder[collided_life_form_id].aggression_factor < breed_threshold:
-                        combine_entities(life_form_1=self.life_form_id, life_form_2=collided_life_form_id)
+                        self.combine_entities(life_form_2=collided_life_form_id)
                         # the breeding will attempt only if the current life form count is not above the
                         # population limit
                         if current_session.current_life_form_amount < args.pop_limit:
@@ -195,6 +195,8 @@ class LifeForm:
                                 seed3=dna_transfer_capsule['transfer_dna_3'], start_x=post_x_gen, start_y=post_y_gen)}
 
                             holder.update(h_update)
+
+                            logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
                         # if the current amount of life forms on the board is at the population limit or above
                         # then do nothing
@@ -586,6 +588,20 @@ class LifeForm:
                     return True, s_item_life_form_id
         return False, None
 
+    def combine_entities(self, life_form_2):
+        """
+        If the aggression factor of both entities is within the combine_threshold range they will reach a stalemate and
+        simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
+        """
+        if self.aggression_factor + args.combine_threshold > \
+                holder[life_form_2].aggression_factor > self.aggression_factor - args.combine_threshold:
+            if args.combine_mode:
+                logger.debug(f'Entity: {self.life_form_id} combined with: {life_form_2}')
+                holder[life_form_2].linked(life_form_id=self.life_form_id)
+                holder[life_form_2].direction = self.direction
+            else:
+                logger.debug('Neither entity killed')
+
 
 def draw_leds(x, y, r, g, b, current_layer):
     """
@@ -668,22 +684,6 @@ def fifty_fifty():
     if random.random() < .5:
         return True
     return False
-
-
-def combine_entities(life_form_1, life_form_2):
-    """
-    If the aggression factor of both entities is within the combine_threshold range they will reach a stalemate and
-    simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
-    """
-    if holder[life_form_1].aggression_factor + args.combine_threshold > \
-            holder[life_form_2].aggression_factor > \
-            holder[life_form_1].aggression_factor - args.combine_threshold:
-        if args.combine_mode:
-            logger.debug(f'Entity: {life_form_1} combined with: {life_form_2}')
-            holder[life_form_2].linked(life_form_id=life_form_1)
-            holder[life_form_2].direction = holder[life_form_1].direction
-        else:
-            logger.debug('Neither entity killed')
 
 
 def main():
