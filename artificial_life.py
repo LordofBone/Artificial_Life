@@ -111,6 +111,10 @@ class LifeForm:
         if collision_detected:
             logger.debug(f'Collision detected: {self.life_form_id} collided with {collided_life_form_id}')
 
+            # store the current direction for later use, like if the life form kills another, it will continue moving
+            # in that direction rather than bounce
+            previous_direction = self.direction
+
             attempted_directions = [self.direction]
 
             # call to randomise direction function for the entity
@@ -225,6 +229,8 @@ class LifeForm:
                         holder[collided_life_form_id].entity_remove()
                         del holder[collided_life_form_id]
 
+                        self.direction = previous_direction
+
                     # if the other entities' aggression factor is higher it will be killed the current entity
                     # it will be removed from the main loops list of entities
                     elif holder[collided_life_form_id].aggression_factor > holder[self.life_form_id].aggression_factor:
@@ -246,12 +252,13 @@ class LifeForm:
 
                         else:
                             logger.debug('Other entity killed')
-
                             holder[self.life_form_id].time_to_live_count += holder[
                                 collided_life_form_id].time_to_live_count
 
                             holder[collided_life_form_id].entity_remove()
                             del holder[collided_life_form_id]
+
+                            self.direction = previous_direction
             return True
         else:
             return False
@@ -764,8 +771,12 @@ def main():
 
                     holder[life_form_id].get_stats()
 
+                    # run a check here to ensure that an expired entity is not being processed, unless it is the last
+                    # entity - as after expiry of the final entity it will still loop one last time and iterate over
+                    # that final entity one last time
                     if life_form_id == current_session.last_removal:
-                        raise Exception(f"Entity that expired this loop has been processed again")
+                        if len(holder) > 1:
+                            raise Exception(f"Entity that expired this loop has been processed again")
 
                     # some debug-like code to identify when a life form goes outside the LED board
                     if holder[life_form_id].matrix_position_x < 0 or holder[
@@ -786,6 +797,7 @@ def main():
                 if current_session.retries:
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.current_layer = 0
+                    current_session.last_removal = -1
 
                     for n in range(args.life_form_total):
                         holder.update(class_generator(n))
@@ -810,6 +822,8 @@ def main():
             f'Program ended by user.\n Total life forms produced: {current_session.life_form_total_count}\n Max '
             f'concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n Last count of active '
             f'Lifeforms: {current_session.life_form_total_count}')
+        if args.hat_edition == "HD":
+            unicorn.off()
         GPIO.cleanup()
 
 
