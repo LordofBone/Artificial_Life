@@ -5,15 +5,20 @@ import time
 
 from dataclasses import dataclass, field
 
-import unicornhat as unicorn
-import unicornhathd as unicornhd
-from unicornhatmini import UnicornHATMini
-
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
     logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
     combine_threshold, hat_model
+
+try:
+    import unicornhat as unicorn
+    import unicornhathd as unicornhd
+    from unicornhatmini import UnicornHATMini
+except ImportError:
+    from unicorn_hat_sim import unicornhat as unicorn
+    from unicorn_hat_sim import unicornhathd as unicornhd
+    from unicorn_hat_sim import unicornphat as UnicornHATMini
 
 logger = logging.getLogger("alife-logger")
 
@@ -894,9 +899,13 @@ if __name__ == '__main__':
 
     if args.hat_edition == "MINI":
         # unicorn hat mini setup
-        unicorn = UnicornHATMini()
-        unicorn.set_brightness(led_brightness)
-        unicorn.set_rotation(0)
+        # todo: figure out why this doesn't work with the phat simulator
+        try:
+            unicorn = UnicornHATMini()
+            unicorn.set_brightness(led_brightness)
+            unicorn.set_rotation(0)
+        except TypeError:
+            unicorn = UnicornHATMini
     elif args.hat_edition == "SD":
         # unicorn hat + unicorn hat hd setup
         unicorn.set_layout(unicorn.AUTO)
