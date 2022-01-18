@@ -451,14 +451,14 @@ class LifeForm:
 
                     for pos in self.positions_around_life_form:
                         if not pos[0] == s_item_x and not pos[1] == s_item_y:
+                            # if free space found is outside the board try another location
+                            if pos[0] > u_width_max or pos[0] < 0:
+                                continue
+                            if pos[1] > u_height_max or pos[1] < 0:
+                                continue
+
                             post_x_gen = pos[0]
                             post_y_gen = pos[1]
-
-                            # if free space found is outside the board try another location
-                            if post_x_gen > u_width_max or post_x_gen < 0:
-                                continue
-                            if post_y_gen > u_height_max or post_y_gen < 0:
-                                continue
 
                             logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
                             # if no other entity is in this location return the co-ords
