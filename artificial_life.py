@@ -27,6 +27,7 @@ class Session:
     highest_concurrent_lifeforms: int
     draw_trails: bool
     retries: bool
+    last_removal: int = -1
     current_layer: int = 0
     current_life_form_amount: int = 0
     life_form_total_count: int = 0
@@ -51,6 +52,9 @@ class LifeForm:
 
         # this list will be used for storing the x, y positions around the life forms location
         self.positions_around_life_form = []
+
+        # set life form life status
+        self.alive = True
 
         # set linked status to False; when linked an entity will continue to move in the same direction as the entity
         # it is linked with essentially combining into one bigger entity
@@ -218,6 +222,7 @@ class LifeForm:
 
                         holder[self.life_form_id].time_to_live_count += holder[collided_life_form_id].time_to_live_count
 
+                        holder[collided_life_form_id].entity_remove()
                         del holder[collided_life_form_id]
 
                     # if the other entities' aggression factor is higher it will be killed the current entity
@@ -245,6 +250,7 @@ class LifeForm:
                             holder[self.life_form_id].time_to_live_count += holder[
                                 collided_life_form_id].time_to_live_count
 
+                            holder[collided_life_form_id].entity_remove()
                             del holder[collided_life_form_id]
             return True
         else:
@@ -341,6 +347,10 @@ class LifeForm:
         move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
         the edge of the board or another entity.
         """
+        # if entity is dead then skip and return
+        if not self.alive:
+            return "Dead"
+
         collision_check = self.collision_factory()
 
         if collision_check == "Died":
@@ -409,6 +419,21 @@ class LifeForm:
         elif self.time_to_live_count <= 0:
             return True
 
+    def entity_remove(self):
+        """
+        Due to the fact the class holder needs copying to be able to iterate and modify it at the same time we can
+        have dead entities being looped over before the current board has been processed, so we need to remove the
+        entity from the board entirely and blank it on top of the alive check that will skip it, to double ensure a
+        dead entity is no longer interacted with during a loop that it died in.
+        """
+        self.matrix_position_x = -100
+        self.matrix_position_y = -100
+        self.red_color = 0
+        self.green_color = 0
+        self.blue_color = 0
+        self.alive = False
+        current_session.last_removal = self.life_form_id
+
     def fade_entity(self):
         """
         Erases an entity from the board by fading it away.
@@ -423,6 +448,7 @@ class LifeForm:
             unicorn.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color, self.green_color,
                               self.blue_color)
             unicorn.show()
+        holder[self.life_form_id].entity_remove()
         del holder[self.life_form_id]
 
     def surrounding_positions(self):
@@ -714,6 +740,7 @@ def main():
                         logger.debug(f"Missing entity: {life_form_id}")
                         continue
                     if expired:
+                        holder[life_form_id].entity_remove()
                         del holder[life_form_id]
                         continue
 
@@ -725,11 +752,20 @@ def main():
 
                     status_check = holder[life_form_id].movement()
 
-                    if status_check == "Died":
+                    # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
+                    # the holder to be modified it will loop through dead entities until the while loop above the for
+                    # loop iterates again with the fresh holder
+                    if status_check == "Dead":
+                        continue
+                    elif status_check == "Died":
+                        holder[life_form_id].entity_remove()
                         del holder[life_form_id]
                         continue
 
                     holder[life_form_id].get_stats()
+
+                    if life_form_id == current_session.last_removal:
+                        raise Exception(f"Entity that expired this loop has been processed again")
 
                     # some debug-like code to identify when a life form goes outside the LED board
                     if holder[life_form_id].matrix_position_x < 0 or holder[
