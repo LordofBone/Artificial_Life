@@ -44,6 +44,10 @@ Run the program from the command line - for some reason I have found that it req
 It will default to use the original Unicorn HAT, but if you add in the parameter '-uh' you can then specify between
 SD, HD or MINI.
 
+This will also run on a system without a physical HAT installed thanks to the 
+[Unicorn HAT simulator](https://github.com/jayniz/unicorn-hat-sim) - although it does have some bugs at the moment.
+
+
 ```
 
 sudo env PATH="$PATH" python artificial_life.py
