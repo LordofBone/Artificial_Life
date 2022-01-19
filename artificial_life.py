@@ -840,7 +840,6 @@ def main():
             f'Lifeforms: {current_session.life_form_total_count}')
         if args.hat_edition == "HD":
             unicorn.off()
-        GPIO.cleanup()
 
 
 if __name__ == '__main__':
