@@ -581,8 +581,8 @@ class LifeForm:
             if self.get_position_up()[1] < 0:
                 return True, None
         elif self.direction == 'move_down_and_right':
-            if self.get_position_down_and_right()[0] > u_width_max or self.get_position_down_and_right()[
-                1] > u_height_max:
+            if self.get_position_down_and_right()[0] > u_width_max or \
+                    self.get_position_down_and_right()[1] > u_height_max:
                 return True, None
         elif self.direction == 'move_up_and_left':
             if self.get_position_up_and_left()[0] < 0 or self.get_position_up_and_left()[1] < 0:
@@ -689,6 +689,7 @@ def get_random():
     Generate a random number to be used as a seed, this is used to generate all 3 life seeds resulting in 1.e+36
     possible types of life form.
     """
+    # todo: add in some sort of fibonacci sequence stuff in here?
     return random.randint(1, 1000000000000)
 
 
@@ -794,11 +795,11 @@ def main():
                             raise Exception(f"Entity that expired this loop has been processed again")
 
                     # some debug-like code to identify when a life form goes outside the LED board
-                    if holder[life_form_id].matrix_position_x < 0 or holder[
-                        life_form_id].matrix_position_x > u_width_max:
+                    if holder[life_form_id].matrix_position_x < 0 or \
+                            holder[life_form_id].matrix_position_x > u_width_max:
                         raise Exception("Life form has exceeded x axis")
-                    if holder[life_form_id].matrix_position_y < 0 or holder[
-                        life_form_id].matrix_position_y > u_height_max:
+                    if holder[life_form_id].matrix_position_y < 0 or \
+                            holder[life_form_id].matrix_position_y > u_height_max:
                         raise Exception("Life form has exceeded y axis")
 
                     draw_leds(holder[life_form_id].matrix_position_x, holder[life_form_id].matrix_position_y,
