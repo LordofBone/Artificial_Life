@@ -11,6 +11,8 @@ from config.parameters import initial_lifeforms_count, speed, population_limit, 
     logging_level, max_breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
     combine_threshold, hat_model
 
+unicorn_simulator = False
+
 try:
     import unicornhat as unicorn
     import unicornhathd as unicornhd
@@ -19,6 +21,8 @@ except ImportError:
     from unicorn_hat_sim import unicornhat as unicorn
     from unicorn_hat_sim import unicornhathd as unicornhd
     from unicorn_hat_sim import unicornphat as UnicornHATMini
+
+    unicorn_simulator = True
 
 logger = logging.getLogger("alife-logger")
 
@@ -677,6 +681,16 @@ def clear_leds():
     unicorn.clear()
 
 
+def hacky_clear_leds_simulator():
+    """
+    The Unicorn HAT simulators clear function does not seem to work at the moment so this is a hack way of clearing
+    the screen
+    """
+    for x in range(u_width):
+        for y in range(u_height):
+            unicorn.set_pixel(x, y, 0, 0, 0)
+
+
 def percentage(percent, whole):
     """
     Determine percentage of a whole number (not currently in use)
@@ -745,7 +759,10 @@ def main():
 
             # clear unicorn hat leds unless draw_trails is True
             if not current_session.draw_trails:
-                clear_leds()
+                if unicorn_simulator:
+                    hacky_clear_leds_simulator()
+                else:
+                    clear_leds()
 
             # check the list of entities has items within
             if holder:
