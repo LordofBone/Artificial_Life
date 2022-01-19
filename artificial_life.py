@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
-    logging_level, breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
+    logging_level, max_breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
     combine_threshold, hat_model
 
 try:
@@ -66,6 +66,8 @@ class LifeForm:
         self.linked_up = False
         self.linked_to = 0
 
+        self.previous_direction = None
+
         self.life_seed1 = seed
         self.life_seed2 = seed2
         self.life_seed3 = seed3
@@ -76,6 +78,7 @@ class LifeForm:
         self.max_aggression_factor = random.randint(1, args.max_aggro)
         self.direction_pre_choice = random.choice(current_session.directions)
         self.max_life = random.randint(1, args.max_ttl)
+        self.breed_threshold = random.randint(0, args.max_breed)
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
@@ -118,7 +121,7 @@ class LifeForm:
 
             # store the current direction for later use, like if the life form kills another, it will continue moving
             # in that direction rather than bounce
-            previous_direction = self.direction
+            self.previous_direction = self.direction
 
             attempted_directions = [self.direction]
 
@@ -150,11 +153,11 @@ class LifeForm:
                 if collided_life_form_id is None:
                     raise Exception("Should not reach this point if ID was none")
 
-                # if the aggression factor is below the configured threshold the life form will attempt to
+                # if the aggression factor is below the entities breed threshold the life form will attempt to
                 # breed with the one it collided with
-                if holder[self.life_form_id].aggression_factor < breed_threshold:
-                    # the other entity also needs to have its aggression factor below the breed threshold
-                    if holder[collided_life_form_id].aggression_factor < breed_threshold:
+                if holder[self.life_form_id].aggression_factor < self.breed_threshold:
+                    # the other entity also needs to have its aggression factor below its breed threshold
+                    if holder[collided_life_form_id].aggression_factor < holder[collided_life_form_id].breed_threshold:
                         self.combine_entities(life_form_2=collided_life_form_id)
                         # the breeding will attempt only if the current life form count is not above the
                         # population limit
@@ -217,56 +220,63 @@ class LifeForm:
                             logger.debug(f"Max life form limit: {args.pop_limit} reached")
                     else:
                         # if the life form has bumped into another life form that is above the breed
-                        # threshold, the other life form will now start moving in the same direction as the
-                        # current life form
-                        holder[collided_life_form_id].direction = holder[self.life_form_id].direction
+                        # threshold, the two life forms will engage in combat
+                        return self.combat(other_life_form_id=collided_life_form_id)
 
-                # if the entities' aggression factor is above 850 it will attempt to kill the entity it has
-                # collided with instead of breed
-                elif holder[self.life_form_id].aggression_factor > breed_threshold:
-                    # if the other entities' aggression factor is lower it will be killed and removed from the
-                    # main loops list of entities
-                    if holder[collided_life_form_id].aggression_factor < holder[self.life_form_id].aggression_factor:
-                        logger.debug('Other entity killed')
+                # if the entities' aggression factor is above its breed threshold it will attempt to kill the entity
+                # it has collided with instead of breed
+                elif holder[self.life_form_id].aggression_factor > self.breed_threshold:
+                    return self.combat(other_life_form_id=collided_life_form_id)
 
-                        holder[self.life_form_id].time_to_live_count += holder[collided_life_form_id].time_to_live_count
-
-                        holder[collided_life_form_id].entity_remove()
-                        del holder[collided_life_form_id]
-
-                        self.direction = previous_direction
-
-                    # if the other entities' aggression factor is higher it will be killed the current entity
-                    # it will be removed from the main loops list of entities
-                    elif holder[collided_life_form_id].aggression_factor > holder[self.life_form_id].aggression_factor:
-                        logger.debug('Current entity killed')
-
-                        holder[collided_life_form_id].time_to_live_count += holder[self.life_form_id].time_to_live_count
-
-                        return "Died"
-
-                    elif holder[collided_life_form_id].aggression_factor == holder[self.life_form_id].aggression_factor:
-                        logger.debug('Entities matched, flipping coin')
-
-                        if fifty_fifty():
-                            logger.debug('Current entity killed')
-                            holder[collided_life_form_id].time_to_live_count += holder[
-                                self.life_form_id].time_to_live_count
-
-                            return "Died"
-
-                        else:
-                            logger.debug('Other entity killed')
-                            holder[self.life_form_id].time_to_live_count += holder[
-                                collided_life_form_id].time_to_live_count
-
-                            holder[collided_life_form_id].entity_remove()
-                            del holder[collided_life_form_id]
-
-                            self.direction = previous_direction
             return True
         else:
             return False
+
+    def combat(self, other_life_form_id):
+        # if the other entities' aggression factor is lower it will be killed and removed from the
+        # main loops list of entities
+        if holder[other_life_form_id].aggression_factor < holder[self.life_form_id].aggression_factor:
+            logger.debug('Other entity killed')
+
+            holder[self.life_form_id].time_to_live_count += holder[other_life_form_id].time_to_live_count
+
+            holder[other_life_form_id].entity_remove()
+            del holder[other_life_form_id]
+
+            self.direction = self.previous_direction
+
+            return True
+
+        # if the other entities' aggression factor is higher it will be killed the current entity
+        # it will be removed from the main loops list of entities
+        elif holder[other_life_form_id].aggression_factor > holder[self.life_form_id].aggression_factor:
+            logger.debug('Current entity killed')
+
+            holder[other_life_form_id].time_to_live_count += holder[self.life_form_id].time_to_live_count
+
+            return "Died"
+
+        elif holder[other_life_form_id].aggression_factor == holder[self.life_form_id].aggression_factor:
+            logger.debug('Entities matched, flipping coin')
+
+            if fifty_fifty():
+                logger.debug('Current entity killed')
+                holder[other_life_form_id].time_to_live_count += holder[
+                    self.life_form_id].time_to_live_count
+
+                return "Died"
+
+            else:
+                logger.debug('Other entity killed')
+                holder[self.life_form_id].time_to_live_count += holder[
+                    other_life_form_id].time_to_live_count
+
+                holder[other_life_form_id].entity_remove()
+                del holder[other_life_form_id]
+
+                self.direction = self.previous_direction
+
+                return True
 
     def get_stats(self):
         """
@@ -765,7 +775,7 @@ def main():
                     status_check = holder[life_form_id].movement()
 
                     # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
-                    # the holder to be modified it will loop through dead entities until the while loop above the for
+                    # the holder to be modified it may loop through dead entities until the while loop above the for
                     # loop iterates again with the fresh holder
                     if status_check == "Dead":
                         continue
@@ -854,6 +864,10 @@ if __name__ == '__main__':
     parser.add_argument('-ma', '--max-aggression', action="store", dest="max_aggro", type=int,
                         default=max_aggression,
                         help='Maximum aggression factor possible for life forms')
+
+    parser.add_argument('-mb', '--max-breed-threshold', action="store", dest="max_breed", type=int,
+                        default=max_breed_threshold,
+                        help='Maximum breed threshold for entities')
 
     parser.add_argument('-dc', '--dna-chaos', action="store", dest="dna_chaos", type=int,
                         default=dna_chaos_chance,
