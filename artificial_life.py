@@ -930,7 +930,7 @@ if __name__ == '__main__':
         unicorn = unicornhd
         unicorn.set_layout(unicorn.AUTO)
         unicorn.brightness(led_brightness)
-        unicorn.rotation(0)
+        unicorn.rotation(270)
 
     u_width, u_height = unicorn.get_shape()
     # the unicorn hat led addresses are 0 indexed so need to account for this
