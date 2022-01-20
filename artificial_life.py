@@ -616,16 +616,16 @@ class LifeForm:
             # using the direction of the current life form determine on next move if the life form were to collide with
             # another, if so return the id of the other life form
             if self.direction == 'move_right':
-                if self.get_position_right()[0] == s_item_x and self.matrix_position_y == s_item_y:
+                if self.get_position_right()[0] == s_item_x and self.get_position_right()[1] == s_item_y:
                     return True, s_item_life_form_id
             elif self.direction == 'move_left':
-                if self.get_position_left()[0] == s_item_x and self.matrix_position_y == s_item_y:
+                if self.get_position_left()[0] == s_item_x and self.get_position_left()[1] == s_item_y:
                     return True, s_item_life_form_id
             elif self.direction == 'move_down':
-                if self.matrix_position_x == s_item_x and self.get_position_down()[1] == s_item_y:
+                if self.get_position_down()[0] == s_item_x and self.get_position_down()[1] == s_item_y:
                     return True, s_item_life_form_id
             elif self.direction == 'move_up':
-                if self.matrix_position_x == s_item_x and self.get_position_up()[1] == s_item_y:
+                if self.get_position_up()[0] == s_item_x and self.get_position_up()[1] == s_item_y:
                     return True, s_item_life_form_id
             elif self.direction == 'move_down_and_right':
                 if self.get_position_down_and_right()[0] == s_item_x and \
