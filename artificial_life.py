@@ -604,6 +604,7 @@ class LifeForm:
 
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
+        # todo: find a way to optimise this
         for item in list(holder):
             # split the items in the sub-list into separate variables for comparison
             s_item_life_form_id = item
@@ -856,7 +857,7 @@ def main():
         logger.info(
             f'Program ended by user.\n Total life forms produced: {current_session.life_form_total_count}\n Max '
             f'concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n Last count of active '
-            f'Lifeforms: {current_session.life_form_total_count}')
+            f'Lifeforms: {current_session.current_life_form_amount}')
         if args.hat_edition == "HD":
             unicorn.off()
 
