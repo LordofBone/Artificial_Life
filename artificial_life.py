@@ -707,7 +707,7 @@ def get_random():
     possible types of life form.
     """
     # todo: add in some sort of fibonacci sequence stuff in here?
-    return random.randint(1, 1000000000000)
+    return random.getrandbits(500)
 
 
 def thanos_snap():
