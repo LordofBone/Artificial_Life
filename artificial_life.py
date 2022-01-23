@@ -9,20 +9,21 @@ from mcpi.minecraft import Minecraft
 
 from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
     logging_level, max_breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
-    combine_threshold, hat_model
+    combine_threshold, hat_model, hat_simulator_size
 
-unicorn_simulator = False
+simulator_refresh = False
 
 try:
     import unicornhat as unicorn
     import unicornhathd as unicornhd
     from unicornhatmini import UnicornHATMini
 except ImportError:
+    from unicorn_hat_sim import UnicornHatSim
     from unicorn_hat_sim import unicornhat as unicorn
     from unicorn_hat_sim import unicornhathd as unicornhd
     from unicorn_hat_sim import unicornphat as UnicornHATMini
 
-    unicorn_simulator = True
+    simulator_refresh = True
 
 logger = logging.getLogger("alife-logger")
 
@@ -49,6 +50,9 @@ class LifeForm:
     """
     The main class that handles each life forms initialisation, movement, colour, expiry and statistics.
     """
+
+    # dictionary to hold all instances of this class
+    lifeforms = {}
 
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
         """
@@ -113,6 +117,8 @@ class LifeForm:
         # get current surrounding co-ords of the life form
         self.surrounding_positions()
 
+        self.lifeforms.update({self.life_form_id: self})
+
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
         # collided with
@@ -130,7 +136,7 @@ class LifeForm:
             attempted_directions = [self.direction]
 
             # call to randomise direction function for the entity
-            direction_attempt = holder[self.life_form_id].randomise_direction()
+            direction_attempt = self.randomise_direction()
 
             collision_detected_again, collided_life_form_id_again = self.collision_detector()
 
@@ -144,13 +150,12 @@ class LifeForm:
                 # storing previously attempted directions so that the same direction is not tried again
                 attempted_directions.append(direction_attempt)
 
-                direction_attempt = holder[self.life_form_id].randomise_direction(
+                direction_attempt = self.randomise_direction(
                     exclusion_list=attempted_directions)
 
                 if not direction_attempt:
-                    holder[self.life_form_id].direction = 'still'
+                    self.direction = 'still'
                     break
-
                 collision_detected_again, collided_life_form_id_again = self.collision_detector()
 
             if collided_life_form_id:
@@ -159,14 +164,14 @@ class LifeForm:
 
                 # if the aggression factor is below the entities breed threshold the life form will attempt to
                 # breed with the one it collided with
-                if holder[self.life_form_id].aggression_factor < self.breed_threshold:
+                if self.aggression_factor < self.breed_threshold:
                     # the other entity also needs to have its aggression factor below its breed threshold
-                    if holder[collided_life_form_id].aggression_factor < holder[collided_life_form_id].breed_threshold:
+                    if LifeForm.lifeforms[collided_life_form_id].aggression_factor < \
+                            LifeForm.lifeforms[collided_life_form_id].breed_threshold:
                         self.combine_entities(life_form_2=collided_life_form_id)
                         # the breeding will attempt only if the current life form count is not above the
                         # population limit
                         if current_session.current_life_form_amount < args.pop_limit:
-
                             # find a place for the new entity to spawn around the current parent life form
                             try:
                                 post_x_gen, post_y_gen = self.board_position_generator(surrounding_area=True,
@@ -194,27 +199,28 @@ class LifeForm:
                                 else:
                                     if key == 'transfer_dna_1':
                                         if fifty_fifty():
-                                            dna_transfer_capsule[key] = holder[self.life_form_id].life_seed1
+                                            dna_transfer_capsule[key] = self.life_seed1
                                         else:
-                                            dna_transfer_capsule[key] = holder[collided_life_form_id].life_seed1
+                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
+                                                collided_life_form_id].life_seed1
                                     elif key == 'transfer_dna_2':
                                         if fifty_fifty():
-                                            dna_transfer_capsule[key] = holder[self.life_form_id].life_seed2
+                                            dna_transfer_capsule[key] = self.life_seed2
                                         else:
-                                            dna_transfer_capsule[key] = holder[collided_life_form_id].life_seed2
+                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
+                                                collided_life_form_id].life_seed2
                                     elif key == 'transfer_dna_3':
                                         if fifty_fifty():
-                                            dna_transfer_capsule[key] = holder[self.life_form_id].life_seed3
+                                            dna_transfer_capsule[key] = self.life_seed3
                                         else:
-                                            dna_transfer_capsule[key] = holder[collided_life_form_id].life_seed3
+                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
+                                                collided_life_form_id].life_seed3
 
-                            h_update = {current_session.life_form_total_count: LifeForm(
+                            LifeForm(
                                 life_form_id=current_session.life_form_total_count,
                                 seed=dna_transfer_capsule['transfer_dna_1'],
                                 seed2=dna_transfer_capsule['transfer_dna_2'],
-                                seed3=dna_transfer_capsule['transfer_dna_3'], start_x=post_x_gen, start_y=post_y_gen)}
-
-                            holder.update(h_update)
+                                seed3=dna_transfer_capsule['transfer_dna_3'], start_x=post_x_gen, start_y=post_y_gen)
 
                             logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
@@ -229,7 +235,7 @@ class LifeForm:
 
                 # if the entities' aggression factor is above its breed threshold it will attempt to kill the entity
                 # it has collided with instead of breed
-                elif holder[self.life_form_id].aggression_factor > self.breed_threshold:
+                elif self.aggression_factor > self.breed_threshold:
                     return self.combat(other_life_form_id=collided_life_form_id)
 
             return True
@@ -239,13 +245,12 @@ class LifeForm:
     def combat(self, other_life_form_id):
         # if the other entities' aggression factor is lower it will be killed and removed from the
         # main loops list of entities
-        if holder[other_life_form_id].aggression_factor < holder[self.life_form_id].aggression_factor:
+        if LifeForm.lifeforms[other_life_form_id].aggression_factor < self.aggression_factor:
             logger.debug('Other entity killed')
 
-            holder[self.life_form_id].time_to_live_count += holder[other_life_form_id].time_to_live_count
+            self.time_to_live_count += LifeForm.lifeforms[other_life_form_id].time_to_live_count
 
-            holder[other_life_form_id].entity_remove()
-            del holder[other_life_form_id]
+            LifeForm.lifeforms[other_life_form_id].entity_remove()
 
             self.direction = self.previous_direction
 
@@ -253,30 +258,28 @@ class LifeForm:
 
         # if the other entities' aggression factor is higher it will be killed the current entity
         # it will be removed from the main loops list of entities
-        elif holder[other_life_form_id].aggression_factor > holder[self.life_form_id].aggression_factor:
+        elif LifeForm.lifeforms[other_life_form_id].aggression_factor > self.aggression_factor:
             logger.debug('Current entity killed')
 
-            holder[other_life_form_id].time_to_live_count += holder[self.life_form_id].time_to_live_count
+            LifeForm.lifeforms[other_life_form_id].time_to_live_count += self.time_to_live_count
 
             return "Died"
 
-        elif holder[other_life_form_id].aggression_factor == holder[self.life_form_id].aggression_factor:
+        elif LifeForm.lifeforms[other_life_form_id].aggression_factor == self.aggression_factor:
             logger.debug('Entities matched, flipping coin')
 
             if fifty_fifty():
                 logger.debug('Current entity killed')
-                holder[other_life_form_id].time_to_live_count += holder[
-                    self.life_form_id].time_to_live_count
+                LifeForm.lifeforms[other_life_form_id].time_to_live_count += self.time_to_live_count
 
                 return "Died"
 
             else:
                 logger.debug('Other entity killed')
-                holder[self.life_form_id].time_to_live_count += holder[
+                self.time_to_live_count += LifeForm.lifeforms[
                     other_life_form_id].time_to_live_count
 
-                holder[other_life_form_id].entity_remove()
-                del holder[other_life_form_id]
+                LifeForm.lifeforms[other_life_form_id].entity_remove()
 
                 self.direction = self.previous_direction
 
@@ -400,7 +403,7 @@ class LifeForm:
                     # have expired and weird things happen, and it may not be accessible from within the class holder
                     # so just randomise direction and de-link
                     try:
-                        self.direction = holder[self.linked_to].direction
+                        self.direction = LifeForm.lifeforms[self.linked_to].direction
                     except KeyError:
                         self.linked_up = False
                         self.direction = self.randomise_direction()
@@ -459,6 +462,7 @@ class LifeForm:
         self.blue_color = 0
         self.alive = False
         current_session.last_removal = self.life_form_id
+        del LifeForm.lifeforms[self.life_form_id]
 
     def fade_entity(self):
         """
@@ -474,8 +478,7 @@ class LifeForm:
             unicorn.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color, self.green_color,
                               self.blue_color)
             unicorn.show()
-        holder[self.life_form_id].entity_remove()
-        del holder[self.life_form_id]
+        self.life_form_id.entity_remove()
 
     def surrounding_positions(self):
         """
@@ -497,9 +500,9 @@ class LifeForm:
         if surrounding_area:
             # check area around entity for other life forms using above list
             if collision_detection:
-                for item in list(holder):
-                    s_item_x = holder[item].matrix_position_x
-                    s_item_y = holder[item].matrix_position_y
+                for life_form in list(LifeForm.lifeforms.values()):
+                    s_item_x = life_form.matrix_position_x
+                    s_item_y = life_form.matrix_position_y
 
                     for pos in self.positions_around_life_form:
                         if not pos[0] == s_item_x and not pos[1] == s_item_y:
@@ -541,10 +544,10 @@ class LifeForm:
 
                 # loop through all entity classes to determine locations
                 try:
-                    for item in list(holder):
+                    for life_form in list(LifeForm.lifeforms.values()):
 
-                        s_item_x = holder[item].matrix_position_x
-                        s_item_y = holder[item].matrix_position_y
+                        s_item_x = life_form.matrix_position_x
+                        s_item_y = life_form.matrix_position_y
                         # if this location on the board does not contain an entity replace the previously
                         # randomly generated co-ords with the currently selected position and return them
                         for x in x_list:
@@ -605,13 +608,13 @@ class LifeForm:
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
         # todo: find a way to optimise this
-        for item in list(holder):
+        for life_form in list(LifeForm.lifeforms.values()):
             # split the items in the sub-list into separate variables for comparison
-            s_item_life_form_id = item
+            s_item_life_form_id = life_form.life_form_id
 
             # get locations of the current entity
-            s_item_x = holder[s_item_life_form_id].matrix_position_x
-            s_item_y = holder[s_item_life_form_id].matrix_position_y
+            s_item_x = life_form.matrix_position_x
+            s_item_y = life_form.matrix_position_y
 
             # using the direction of the current life form determine on next move if the life form were to collide with
             # another, if so return the id of the other life form
@@ -649,11 +652,11 @@ class LifeForm:
         simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
         """
         if self.aggression_factor + args.combine_threshold > \
-                holder[life_form_2].aggression_factor > self.aggression_factor - args.combine_threshold:
+                LifeForm.lifeforms[life_form_2].aggression_factor > self.aggression_factor - args.combine_threshold:
             if args.combine_mode:
                 logger.debug(f'Entity: {self.life_form_id} combined with: {life_form_2}')
-                holder[life_form_2].linked(life_form_id=self.life_form_id)
-                holder[life_form_2].direction = self.direction
+                LifeForm.lifeforms[life_form_2].linked(life_form_id=self.life_form_id)
+                LifeForm.lifeforms[life_form_2].direction = self.direction
             else:
                 logger.debug('Neither entity killed')
 
@@ -715,10 +718,10 @@ def thanos_snap():
     Randomly kill half of the entities in existence on the board
     """
     # loop for 50% of all existing entities choosing at random to eliminate
-    for x in range(int(len(holder) / 2)):
-        vanished = random.choice(holder)
+    for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
+        vanished = random.choice((list(LifeForm.lifeforms.values())))
         # fade them away
-        holder[vanished].fade_entity()
+        LifeForm.lifeforms[vanished].fade_entity()
         time.sleep(0.1)
     logger.info("Perfectly balanced as all things should be")
     time.sleep(2)
@@ -731,16 +734,13 @@ def class_generator(life_form_id):
     form with random seeds for each life seed generation.
     """
     # todo: figure out why the whole board will not fill
-    if not holder:
+    if not LifeForm.lifeforms.values():
         starting_x = random.randint(0, u_width_max)
         starting_y = random.randint(0, u_height_max)
     else:
-        starting_x, starting_y = holder[0].board_position_generator(collision_detection=True)
-    generated_class = {
-        life_form_id: LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
-                               start_x=starting_x, start_y=starting_y)}
-
-    return generated_class
+        starting_x, starting_y = LifeForm.lifeforms[0].board_position_generator(collision_detection=True)
+    LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
+             start_x=starting_x, start_y=starting_y)
 
 
 def fifty_fifty():
@@ -762,38 +762,37 @@ def main():
 
             # clear unicorn hat leds unless draw_trails is True
             if not current_session.draw_trails:
-                if unicorn_simulator:
+                if simulator_refresh:
                     hacky_clear_leds_simulator()
                 else:
                     clear_leds()
 
             # check the list of entities has items within
-            if holder:
+            if LifeForm.lifeforms.values():
                 # for time the current set of life forms is processed increase the layer for minecraft to set blocks
                 # on by 1
                 current_session.current_layer += 1
 
                 # for each life_form_id in the list use the life_form_id of the life form to work from
-                for life_form_id in list(holder):
+                for life_form in list(LifeForm.lifeforms.values()):
                     # call expiry function for current life form and update the list of life forms
                     # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
                     try:
-                        expired = holder[life_form_id].expire_entity()
+                        expired = life_form.expire_entity()
+                        if expired:
+                            life_form.entity_remove()
+                            continue
                     except KeyError:
-                        logger.debug(f"Missing entity: {life_form_id}")
-                        continue
-                    if expired:
-                        holder[life_form_id].entity_remove()
-                        del holder[life_form_id]
+                        logger.debug(f"Missing entity: {life_form.life_form_id}")
                         continue
 
-                    current_session.current_life_form_amount = len(holder)
+                    current_session.current_life_form_amount = len(LifeForm.lifeforms.values())
                     # if the current number of active life forms is higher than the previous record of concurrent
                     # life forms, update the concurrent life forms variable
                     if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
                         current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
 
-                    status_check = holder[life_form_id].movement()
+                    status_check = life_form.movement()
 
                     # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
                     # the holder to be modified it may loop through dead entities until the while loop above the for
@@ -801,42 +800,41 @@ def main():
                     if status_check == "Dead":
                         continue
                     elif status_check == "Died":
-                        holder[life_form_id].entity_remove()
-                        del holder[life_form_id]
+                        life_form.entity_remove()
                         continue
 
-                    holder[life_form_id].get_stats()
+                    life_form.get_stats()
 
                     # run a check here to ensure that an expired entity is not being processed, unless it is the last
                     # entity - as after expiry of the final entity it will still loop one last time and iterate over
                     # that final entity one last time
-                    if life_form_id == current_session.last_removal:
-                        if len(holder) > 1:
+                    if life_form.life_form_id == current_session.last_removal:
+                        if len(LifeForm.lifeforms.values()) > 1:
                             raise Exception(f"Entity that expired this loop has been processed again")
 
                     # some debug-like code to identify when a life form goes outside the LED board
-                    if holder[life_form_id].matrix_position_x < 0 or \
-                            holder[life_form_id].matrix_position_x > u_width_max:
+                    if life_form.matrix_position_x < 0 or \
+                            life_form.matrix_position_x > u_width_max:
                         raise Exception("Life form has exceeded x axis")
-                    if holder[life_form_id].matrix_position_y < 0 or \
-                            holder[life_form_id].matrix_position_y > u_height_max:
+                    if life_form.matrix_position_y < 0 or \
+                            life_form.matrix_position_y > u_height_max:
                         raise Exception("Life form has exceeded y axis")
 
-                    draw_leds(holder[life_form_id].matrix_position_x, holder[life_form_id].matrix_position_y,
-                              holder[life_form_id].red_color, holder[life_form_id].green_color,
-                              holder[life_form_id].blue_color, current_session.current_layer)
+                    draw_leds(life_form.matrix_position_x, life_form.matrix_position_y,
+                              life_form.red_color, life_form.green_color,
+                              life_form.blue_color, current_session.current_layer)
 
-            # if the main list of entities is empty then all have expired; the program displays final information 
+            # if the main list of entities is empty then all have expired; the program displays final information
             # about the programs run and exits; unless retry mode is active, then a new set of entities are created
             # and the simulation starts fresh with the same initial configuration
-            elif not holder:
+            elif not LifeForm.lifeforms.values():
                 if current_session.retries:
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.current_layer = 0
                     current_session.last_removal = -1
 
                     for n in range(args.life_form_total):
-                        holder.update(class_generator(n))
+                        class_generator(n)
 
                     continue
                 else:
@@ -906,6 +904,10 @@ if __name__ == '__main__':
                         help='If a life form collides with another and both of their aggression levels are within '
                              'this range and combining is enabled, they will combine (move together)')
 
+    parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", type=tuple,
+                        default=hat_simulator_size,
+                        help='Maximum possible time to move number for entities')
+
     parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode",
                         help='Enables life forms to combine into bigger ones')
 
@@ -921,8 +923,12 @@ if __name__ == '__main__':
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
 
+    parser.add_argument('-sim', '--unicorn-hat-sim', action="store_true", dest="simulator",
+                        help='Whether to use the Unicorn HAT simulator or not')
+
     parser.add_argument('-hm', '--hat-model', action="store", dest="hat_edition", type=str, default=hat_model,
-                        choices=['SD', 'HD', 'MINI'], help='Whether the program is using a Unicorn Mini HAT')
+                        choices=['SD', 'HD', 'MINI', 'CUSTOM'], help='What type of HAT the program is using. CUSTOM '
+                                                                     'only works with Unicorn HAT Simulator')
 
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
@@ -930,6 +936,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level)
+
+    if args.simulator:
+        from unicorn_hat_sim import UnicornHatSim
+
+        from unicorn_hat_sim import unicornhat as unicorn
+        from unicorn_hat_sim import unicornhathd as unicornhd
+        from unicorn_hat_sim import unicornphat as UnicornHATMini
+
+        simulator_refresh = True
 
     if args.hat_edition == "MINI":
         # unicorn hat mini setup
@@ -951,6 +966,18 @@ if __name__ == '__main__':
         unicorn.set_layout(unicorn.AUTO)
         unicorn.brightness(led_brightness)
         unicorn.rotation(270)
+    elif args.hat_edition == "CUSTOM":
+        # unicorn hat + unicorn hat hd setup
+        try:
+            unicorn = UnicornHatSim(args.custom_size_simulator[0], args.custom_size_simulator[1], 180)
+        except NameError:
+            logger.info(f"Custom mode set without simulator mode on, defaulting to HD physical HAT")
+            unicorn = unicornhd
+            args.hat_edition = "HD"
+        unicorn.set_layout(unicorn.AUTO)
+        unicorn.brightness(led_brightness)
+        unicorn.rotation(0)
+        simulator_refresh = True
 
     u_width, u_height = unicorn.get_shape()
     # the unicorn hat led addresses are 0 indexed so need to account for this
@@ -976,10 +1003,8 @@ if __name__ == '__main__':
     current_session = Session(life_form_total_count=args.life_form_total, draw_trails=args.trails_on,
                               retries=args.retry_on, highest_concurrent_lifeforms=args.life_form_total)
 
-    holder = {}
-
     # generate life form classes
     for i in range(args.life_form_total):
-        holder.update(class_generator(i))
+        class_generator(i)
 
     main()

@@ -11,3 +11,4 @@ static_entity_chance = 50
 led_brightness = 0.3
 combine_threshold = 25
 hat_model = "HD"
+hat_simulator_size = 64, 64

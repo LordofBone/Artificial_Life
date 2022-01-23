@@ -68,6 +68,8 @@ Arguments that can be passed:
                         Maximum time to live possible for life forms
   -ma MAX_AGGRO, --max-aggression MAX_AGGRO
                         Maximum aggression factor possible for life forms
+  -mb MAX_BREED, --max-breed-threshold MAX_BREED
+                        Maximum breed threshold for entities
   -dc DNA_CHAOS, --dna-chaos DNA_CHAOS
                         Percentage chance of random DNA upon breeding of
                         entities
@@ -79,6 +81,8 @@ Arguments that can be passed:
                         If a life form collides with another and both of their
                         aggression levels are within this range and combining
                         is enabled, they will combine (move together)
+  -shs CUSTOM_SIZE_SIMULATOR, --simulator-hat-size CUSTOM_SIZE_SIMULATOR
+                        Maximum possible time to move number for entities
   -c, --combine-mode    Enables life forms to combine into bigger ones
   -mc, --minecraft-mode
                         Enables Minecraft mode
@@ -87,8 +91,11 @@ Arguments that can be passed:
   -g, --gravity         Gravity enabled, still entities will fall to the floor
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
-  -hm {SD,HD,MINI}, --hat-model {SD,HD,MINI}
-                        Whether the program is using a Unicorn Mini HAT
+  -sim, --unicorn-hat-sim
+                        Whether to use the Unicorn HAT simulator or not
+  -hm {SD,HD,MINI,CUSTOM}, --hat-model {SD,HD,MINI,CUSTOM}
+                        What type of HAT the program is using. CUSTOM only
+                        works with Unicorn HAT Simulator
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
 ```
