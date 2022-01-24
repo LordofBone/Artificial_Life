@@ -88,6 +88,8 @@ Arguments that can be passed:
                         Enables Minecraft mode
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
                         of entities
+  -dcd, --disable_collision_detection
+                        Whether entities can spawn over each other or not
   -g, --gravity         Gravity enabled, still entities will fall to the floor
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
