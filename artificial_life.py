@@ -174,8 +174,7 @@ class LifeForm:
                         if current_session.current_life_form_amount < args.pop_limit:
                             # find a place for the new entity to spawn around the current parent life form
                             try:
-                                post_x_gen, post_y_gen = self.board_position_generator(surrounding_area=True,
-                                                                                       collision_detection=True)
+                                post_x_gen, post_y_gen = self.board_position_generator(surrounding_area=True)
                             except TypeError:
                                 logger.debug("No space available for a spawn of a new life form")
 
@@ -305,28 +304,52 @@ class LifeForm:
         logger.debug(f'Color: R-{self.red_color} G-{self.green_color} B-{self.blue_color} \n')
 
     def get_position_up(self):
-        return self.matrix_position_x, self.matrix_position_y - 1
+        position = self.matrix_position_x, self.matrix_position_y - 1
+        if position[1] < 0:
+            return None
+        return position
 
     def get_position_down(self):
-        return self.matrix_position_x, self.matrix_position_y + 1
+        position = self.matrix_position_x, self.matrix_position_y + 1
+        if position[1] > u_height_max:
+            return None
+        return position
 
     def get_position_left(self):
-        return self.matrix_position_x - 1, self.matrix_position_y
+        position = self.matrix_position_x - 1, self.matrix_position_y
+        if position[0] < 0:
+            return None
+        return position
 
     def get_position_right(self):
-        return self.matrix_position_x + 1, self.matrix_position_y
+        position = self.matrix_position_x + 1, self.matrix_position_y
+        if position[0] > u_width_max:
+            return None
+        return position
 
     def get_position_up_and_right(self):
-        return self.matrix_position_x + 1, self.matrix_position_y - 1
+        position = self.matrix_position_x + 1, self.matrix_position_y - 1
+        if position[0] > u_width_max or position[1] < 0:
+            return None
+        return position
 
     def get_position_up_and_left(self):
-        return self.matrix_position_x - 1, self.matrix_position_y - 1
+        position = self.matrix_position_x - 1, self.matrix_position_y - 1
+        if position[0] < 0 or position[1] < 0:
+            return None
+        return position
 
     def get_position_down_and_right(self):
-        return self.matrix_position_x + 1, self.matrix_position_y + 1
+        position = self.matrix_position_x + 1, self.matrix_position_y + 1
+        if position[0] > u_width_max or position[1] > u_height_max:
+            return None
+        return position
 
     def get_position_down_and_left(self):
-        return self.matrix_position_x - 1, self.matrix_position_y + 1
+        position = self.matrix_position_x - 1, self.matrix_position_y + 1
+        if position[0] < 0 or position[1] > u_height_max:
+            return None
+        return position
 
     def move_up(self):
         self.matrix_position_y -= 1
@@ -489,37 +512,46 @@ class LifeForm:
                                            self.get_position_up_and_left(), self.get_position_down_and_left(),
                                            self.get_position_down_and_right()]
 
+        self.positions_around_life_form = list(filter(None, self.positions_around_life_form))
+
         # shuffle the position list to prevent the same directions being favoured each time
         random.shuffle(self.positions_around_life_form)
 
-    def board_position_generator(self, collision_detection=True, surrounding_area=False):
+    def board_position_generator(self, surrounding_area=False):
         """
         Get board positions for new entities, allows for collision detection, either choosing from across the whole
         board or in the immediate area around a life form (determined by the life_form_id variable passed in).
         """
         if surrounding_area:
             # check area around entity for other life forms using above list
-            if collision_detection:
+            if args.spawn_collision_detection:
+                used_coords = []
+
                 for life_form in list(LifeForm.lifeforms.values()):
                     s_item_x = life_form.matrix_position_x
                     s_item_y = life_form.matrix_position_y
 
-                    for pos in self.positions_around_life_form:
-                        if not pos[0] == s_item_x and not pos[1] == s_item_y:
-                            # if free space found is outside the board try another location
-                            if pos[0] > u_width_max or pos[0] < 0:
-                                continue
-                            if pos[1] > u_height_max or pos[1] < 0:
-                                continue
+                    used_coords.append((s_item_x, s_item_y))
 
-                            post_x_gen = pos[0]
-                            post_y_gen = pos[1]
+                free_coords = set(self.positions_around_life_form).difference(set(used_coords))
 
-                            logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
-                            # if no other entity is in this location return the co-ords
-                            return post_x_gen, post_y_gen
-                # if no free space is found return None
-                return None
+                try:
+                    random_free_coord = random.choice(list(free_coords))
+                except IndexError:
+                    # if no free space is found return None
+                    return None
+
+                post_x_gen = random_free_coord[0]
+                post_y_gen = random_free_coord[1]
+
+                tester = post_x_gen, post_y_gen
+
+                if tester in used_coords:
+                    raise Exception(f"Co-ordinate: {tester} clashes with used co-ords: {used_coords}")
+
+                logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
+                # if no other entity is in this location return the co-ords
+                return post_x_gen, post_y_gen
             else:
                 # with no collision detection enabled just choose a random spot
                 positions = random.choice(self.positions_around_life_form)
@@ -530,32 +562,30 @@ class LifeForm:
 
         else:
             # with collision detection determine if a spot on the board contains a life form
-            if collision_detection:
+            if args.spawn_collision_detection:
                 post_x_gen = None
                 post_y_gen = None
 
-                # get lists of possible x and y positions to be shuffled
-                x_list = source_x_list
-                y_list = source_y_list
-
-                # shuffle them so they can be iterated through randomly
-                random.shuffle(x_list)
-                random.shuffle(y_list)
-
                 # loop through all entity classes to determine locations
                 try:
-                    for life_form in list(LifeForm.lifeforms.values()):
+                    used_coords = []
 
+                    for life_form in list(LifeForm.lifeforms.values()):
                         s_item_x = life_form.matrix_position_x
                         s_item_y = life_form.matrix_position_y
-                        # if this location on the board does not contain an entity replace the previously
-                        # randomly generated co-ords with the currently selected position and return them
-                        for x in x_list:
-                            if not x == s_item_x:
-                                post_x_gen = x
-                        for y in y_list:
-                            if not y == s_item_y:
-                                post_y_gen = y
+                        used_coords.append((s_item_x, s_item_y))
+
+                    free_coords = set(board_list).difference(set(used_coords))
+
+                    try:
+                        random_free_coord = random.choice(list(free_coords))
+                    except IndexError:
+                        # if no free space is found return None
+                        return None
+
+                    post_x_gen = random_free_coord[0]
+                    post_y_gen = random_free_coord[1]
+
                 # if this is the first entity being created then return random positions as there is nothing to loop
                 # through and therefore nothing on the board to collide with
                 except NameError:
@@ -576,29 +606,52 @@ class LifeForm:
         """
         # check to see if the life form has reached the edge of the board vs its direction
         if self.direction == 'move_right':
-            if self.get_position_right()[0] > u_width_max:
+            try:
+                if self.get_position_right()[0]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_left':
-            if self.get_position_left()[0] < 0:
+            try:
+                if self.get_position_left()[0]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_down':
-            if self.get_position_down()[1] > u_height_max:
+            try:
+                if self.get_position_down()[1]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_up':
-            if self.get_position_up()[1] < 0:
+            try:
+                if self.get_position_up()[1]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_down_and_right':
-            if self.get_position_down_and_right()[0] > u_width_max or \
-                    self.get_position_down_and_right()[1] > u_height_max:
+            try:
+                if self.get_position_down_and_right()[0] or self.get_position_down_and_right()[1]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_up_and_left':
-            if self.get_position_up_and_left()[0] < 0 or self.get_position_up_and_left()[1] < 0:
+            try:
+                if self.get_position_up_and_left()[0] or self.get_position_up_and_left()[1]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_down_and_left':
-            if self.get_position_down_and_left()[0] < 0 or self.get_position_down_and_left()[1] > u_height_max:
+            try:
+                if self.get_position_down_and_left()[0] or self.get_position_down_and_left()[1]:
+                    pass
+            except TypeError:
                 return True, None
         elif self.direction == 'move_up_and_right':
-            if self.get_position_up_and_right()[0] > u_width_max or self.get_position_up_and_right()[1] < 0:
+            try:
+                if self.get_position_up_and_right()[0] or self.get_position_up_and_right()[1]:
+                    pass
+            except TypeError:
                 return True, None
         # if direction is 'still' then the life form is not moving and therefore is not going to collide with
         # anything
@@ -733,12 +786,14 @@ def class_generator(life_form_id):
     life form life_form_ids assign a random x and y number for the position on the board and create the new life
     form with random seeds for each life seed generation.
     """
-    # todo: figure out why the whole board will not fill
     if not LifeForm.lifeforms.values():
         starting_x = random.randint(0, u_width_max)
         starting_y = random.randint(0, u_height_max)
     else:
-        starting_x, starting_y = LifeForm.lifeforms[0].board_position_generator(collision_detection=True)
+        try:
+            starting_x, starting_y = LifeForm.lifeforms[0].board_position_generator()
+        except TypeError:
+            return
     LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
              start_x=starting_x, start_y=starting_y)
 
@@ -772,7 +827,6 @@ def main():
                 # for time the current set of life forms is processed increase the layer for minecraft to set blocks
                 # on by 1
                 current_session.current_layer += 1
-
                 # for each life_form_id in the list use the life_form_id of the life form to work from
                 for life_form in list(LifeForm.lifeforms.values()):
                     # call expiry function for current life form and update the list of life forms
@@ -786,12 +840,11 @@ def main():
                         logger.debug(f"Missing entity: {life_form.life_form_id}")
                         continue
 
-                    current_session.current_life_form_amount = len(LifeForm.lifeforms.values())
+                    current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
                     # if the current number of active life forms is higher than the previous record of concurrent
                     # life forms, update the concurrent life forms variable
                     if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
                         current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
-
                     status_check = life_form.movement()
 
                     # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
@@ -917,6 +970,10 @@ if __name__ == '__main__':
     parser.add_argument('-tr', '--trails', action="store_true", dest="trails_on",
                         help='Stops the HAT from being cleared, resulting in trails of entities')
 
+    parser.add_argument('-dcd', '--disable_collision_detection', action="store_false",
+                        dest="spawn_collision_detection",
+                        help='Whether entities can spawn over each other or not')
+
     parser.add_argument('-g', '--gravity', action="store_true", dest="gravity",
                         help='Gravity enabled, still entities will fall to the floor')
 
@@ -984,16 +1041,13 @@ if __name__ == '__main__':
     u_width_max = u_width - 1
     u_height_max = u_height - 1
 
-    # todo: see if there is a better way of doing this and shuffling the lists
     # generate list of all width and height positions for use in shuffling later
     # generate the lists dynamically from the raw width and height of the board to ensure the lists are
     # zero-indexed which is what is required for the LED drawing x, y positions
-    source_x_list = []
-    source_y_list = []
+    board_list = []
     for x_position in range(u_width):
-        source_x_list.append(x_position)
-    for y_position in range(u_height):
-        source_y_list.append(y_position)
+        for y_position in range(u_height):
+            board_list.append((x_position, y_position))
 
     # setup Minecraft connection if mc_mode is True
     if args.mc_mode:
