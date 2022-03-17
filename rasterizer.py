@@ -39,9 +39,11 @@ class ScreenDrawer:
         self.frame_refresh_delay_ms = 1 / buffer_refresh
         logger.debug(f'Milliseconds per-frame to aim for: {self.frame_refresh_delay_ms}')
 
+        self.max_pixel_combine = self.hat_control.u_width_max * self.hat_control.u_height_max
+
         frame_buffer_access.generate_buffers(self.hat_control.u_width, self.hat_control.u_height)
 
-        self.shader_access = Shaders()
+        self.shader_access = Shaders(self.max_pixel_combine)
 
         # todo: make this configurable by parameters.py and/or argsparse
         self.gradient_background = True

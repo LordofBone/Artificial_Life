@@ -1,6 +1,6 @@
 
 class Shaders:
-    def __init__(self):
+    def __init__(self, max_coord_combine):
         self.max_colour = 255
         self.base_red = (128, 0, 0)
         self.base_green = (0, 128, 0)
@@ -10,6 +10,8 @@ class Shaders:
         self.super_green = (0, 255, 0)
         self.super_blue = (0, 0, 255)
         self.super_white = (255, 255, 255)
+
+        self.max_coord_combine = max_coord_combine
 
     # thanks to
     # https://stackoverflow.com/questions/52992900/how-to-blend-two-rgb-colors-front-and-back-based-on-their-alpha-channels
@@ -40,7 +42,9 @@ class Shaders:
         return shaded_colour
 
     def full_screen_shader_gradient(self, coord, pixel):
-        output_from_coord = coord[0] + coord[1]
-        pixel_alpha = (output_from_coord / 255) * 255
-        shaded_colour = self.custom_rgb_shader(pixel, self.base_blue, pixel_alpha)
+        output_from_coord = coord[0] * coord[1]
+
+        pixel_alpha = (output_from_coord / self.max_coord_combine) * self.max_colour
+        shaded_colour = self.custom_rgb_shader(pixel, self.base_green, pixel_alpha)
+
         return shaded_colour
