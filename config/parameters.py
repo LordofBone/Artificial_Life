@@ -1,5 +1,4 @@
 initial_lifeforms_count = 10
-speed = 0
 population_limit = 50
 max_time_to_live = 1000
 max_aggression = 1000
@@ -12,3 +11,5 @@ led_brightness = 0.3
 combine_threshold = 25
 hat_model = "HD"
 hat_simulator_size = 64, 64
+hat_buffer_refresh_rate = 60
+refresh_logic_link = True

@@ -1,29 +1,22 @@
 import argparse
 import logging
 import random
-import time
+
+from time import time
 
 from dataclasses import dataclass, field
 
 from mcpi.minecraft import Minecraft
 
-from config.parameters import initial_lifeforms_count, speed, population_limit, max_time_to_live, max_aggression, \
+from hat_controller import HATController
+
+from rasterizer import ScreenDrawer, frame_buffer_access
+
+from threading import Thread
+
+from config.parameters import initial_lifeforms_count, population_limit, max_time_to_live, max_aggression, \
     logging_level, max_breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
-    combine_threshold, hat_model, hat_simulator_size
-
-simulator_refresh = False
-
-try:
-    import unicornhat as unicorn
-    import unicornhathd as unicornhd
-    from unicornhatmini import UnicornHATMini
-except ImportError:
-    from unicorn_hat_sim import UnicornHatSim
-    from unicorn_hat_sim import unicornhat as unicorn
-    from unicorn_hat_sim import unicornhathd as unicornhd
-    from unicorn_hat_sim import unicornphat as UnicornHATMini
-
-    simulator_refresh = True
+    combine_threshold, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link
 
 logger = logging.getLogger("alife-logger")
 
@@ -114,10 +107,15 @@ class LifeForm:
         self.matrix_position_x = start_x
         self.matrix_position_y = start_y
 
+        self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
+
         # get current surrounding co-ords of the life form
         self.surrounding_positions()
 
         self.lifeforms.update({self.life_form_id: self})
+
+        frame_buffer_access.write_to_buffer(self.matrix_position_x, self.matrix_position_y,
+                                            self.red_color, self.green_color, self.blue_color)
 
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
@@ -311,7 +309,7 @@ class LifeForm:
 
     def get_position_down(self):
         position = self.matrix_position_x, self.matrix_position_y + 1
-        if position[1] > u_height_max:
+        if position[1] > HATControl.u_height_max:
             return None
         return position
 
@@ -323,13 +321,13 @@ class LifeForm:
 
     def get_position_right(self):
         position = self.matrix_position_x + 1, self.matrix_position_y
-        if position[0] > u_width_max:
+        if position[0] > HATControl.u_width_max:
             return None
         return position
 
     def get_position_up_and_right(self):
         position = self.matrix_position_x + 1, self.matrix_position_y - 1
-        if position[0] > u_width_max or position[1] < 0:
+        if position[0] > HATControl.u_width_max or position[1] < 0:
             return None
         return position
 
@@ -341,13 +339,13 @@ class LifeForm:
 
     def get_position_down_and_right(self):
         position = self.matrix_position_x + 1, self.matrix_position_y + 1
-        if position[0] > u_width_max or position[1] > u_height_max:
+        if position[0] > HATControl.u_width_max or position[1] > HATControl.u_height_max:
             return None
         return position
 
     def get_position_down_and_left(self):
         position = self.matrix_position_x - 1, self.matrix_position_y + 1
-        if position[0] < 0 or position[1] > u_height_max:
+        if position[0] < 0 or position[1] > HATControl.u_height_max:
             return None
         return position
 
@@ -498,9 +496,10 @@ class LifeForm:
                 self.green_color -= 1
             if self.blue_color > 0:
                 self.blue_color -= 1
-            unicorn.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color, self.green_color,
-                              self.blue_color)
-            unicorn.show()
+            HATControl.unicorn.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color,
+                                         self.green_color,
+                                         self.blue_color)
+            HATControl.unicorn.show()
         self.life_form_id.entity_remove()
 
     def surrounding_positions(self):
@@ -527,7 +526,7 @@ class LifeForm:
             if args.spawn_collision_detection:
                 used_coords = []
 
-                for life_form in list(LifeForm.lifeforms.values()):
+                for life_form in LifeForm.lifeforms.copy().values():
                     s_item_x = life_form.matrix_position_x
                     s_item_y = life_form.matrix_position_y
 
@@ -570,7 +569,7 @@ class LifeForm:
                 try:
                     used_coords = []
 
-                    for life_form in list(LifeForm.lifeforms.values()):
+                    for life_form in LifeForm.lifeforms.copy().values():
                         s_item_x = life_form.matrix_position_x
                         s_item_y = life_form.matrix_position_y
                         used_coords.append((s_item_x, s_item_y))
@@ -595,8 +594,8 @@ class LifeForm:
             # if no collision detection just return random x, y co-ords
             else:
                 # if collision detection not enabled then choose from anywhere on the board
-                post_x_gen = random.randint(0, u_width_max)
-                post_y_gen = random.randint(0, u_height_max)
+                post_x_gen = random.randint(0, HATControl.u_width_max)
+                post_y_gen = random.randint(0, HATControl.u_height_max)
 
                 return post_x_gen, post_y_gen
 
@@ -661,7 +660,7 @@ class LifeForm:
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
         # todo: find a way to optimise this
-        for life_form in list(LifeForm.lifeforms.values()):
+        for life_form in LifeForm.lifeforms.copy().values():
             # split the items in the sub-list into separate variables for comparison
             s_item_life_form_id = life_form.life_form_id
 
@@ -714,42 +713,6 @@ class LifeForm:
                 logger.debug('Neither entity killed')
 
 
-def draw_leds(x, y, r, g, b, current_layer):
-    """
-    Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
-    relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
-    amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
-    """
-    try:
-        unicorn.set_pixel(x, y, r, g, b)
-    except IndexError:
-        raise Exception(f"Set pixel did not like X:{x} Y:{y} R:{r} G:{g} B:{b}")
-    # todo: improve this greatly
-    if args.mc_mode:
-        player_x, player_y, player_z = mc.player.getPos()
-        random.seed(r + g + b)
-        random_block = random.randint(1, 22)
-        random.seed()
-        mc.setBlock(player_x + x, player_y + 10 + current_layer, player_z + y, random_block)
-
-
-def clear_leds():
-    """
-    Clear Unicorn HAT LEDs.
-    """
-    unicorn.clear()
-
-
-def hacky_clear_leds_simulator():
-    """
-    The Unicorn HAT simulators clear function does not seem to work at the moment so this is a hack way of clearing
-    the screen
-    """
-    for x in range(u_width):
-        for y in range(u_height):
-            unicorn.set_pixel(x, y, 0, 0, 0)
-
-
 def percentage(percent, whole):
     """
     Determine percentage of a whole number (not currently in use)
@@ -770,14 +733,13 @@ def thanos_snap():
     """
     Randomly kill half of the entities in existence on the board
     """
+    # todo: reconfigure all this to use the new rasterizer
     # loop for 50% of all existing entities choosing at random to eliminate
     for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
         vanished = random.choice((list(LifeForm.lifeforms.values())))
         # fade them away
         LifeForm.lifeforms[vanished].fade_entity()
-        time.sleep(0.1)
     logger.info("Perfectly balanced as all things should be")
-    time.sleep(2)
 
 
 def class_generator(life_form_id):
@@ -787,8 +749,8 @@ def class_generator(life_form_id):
     form with random seeds for each life seed generation.
     """
     if not LifeForm.lifeforms.values():
-        starting_x = random.randint(0, u_width_max)
-        starting_y = random.randint(0, u_height_max)
+        starting_x = random.randint(0, HATControl.u_width_max)
+        starting_y = random.randint(0, HATControl.u_height_max)
     else:
         try:
             starting_x, starting_y = LifeForm.lifeforms[0].board_position_generator()
@@ -808,100 +770,102 @@ def fifty_fifty():
 
 
 def main():
+    frame_refresh_delay_ms = 1 / hat_buffer_refresh_rate
     """
     Main loop where all life form movement and interaction takes place
     """
     # wrap main loop into a try/catch to allow keyboard exit and cleanup
     try:
+        next_frame = time() + frame_refresh_delay_ms
         while True:
 
-            # clear unicorn hat leds unless draw_trails is True
-            if not current_session.draw_trails:
-                if simulator_refresh:
-                    hacky_clear_leds_simulator()
-                else:
-                    clear_leds()
+            if time() > next_frame or not refresh_logic_link:
 
-            # check the list of entities has items within
-            if LifeForm.lifeforms.values():
-                # for time the current set of life forms is processed increase the layer for minecraft to set blocks
-                # on by 1
-                current_session.current_layer += 1
-                # for each life_form_id in the list use the life_form_id of the life form to work from
-                for life_form in list(LifeForm.lifeforms.values()):
-                    # call expiry function for current life form and update the list of life forms
-                    # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
-                    try:
-                        expired = life_form.expire_entity()
-                        if expired:
+                # check the list of entities has items within
+                if LifeForm.lifeforms.values():
+                    # for time the current set of life forms is processed increase the layer for minecraft to set blocks
+                    # on by 1
+                    current_session.current_layer += 1
+                    # for each life_form_id in the list use the life_form_id of the life form to work from
+                    for life_form in LifeForm.lifeforms.copy().values():
+
+                        # call expiry function for current life form and update the list of life forms
+                        # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
+                        try:
+                            expired = life_form.expire_entity()
+                            if expired:
+                                life_form.entity_remove()
+                                continue
+                        except KeyError:
+                            logger.debug(f"Missing entity: {life_form.life_form_id}")
+                            continue
+
+                        current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
+                        # if the current number of active life forms is higher than the previous record of concurrent
+                        # life forms, update the concurrent life forms variable
+                        if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
+                            current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
+                        status_check = life_form.movement()
+
+                        # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
+                        # the holder to be modified it may loop through dead entities until the while loop above the for
+                        # loop iterates again with the fresh holder
+                        if status_check == "Dead":
+                            continue
+                        elif status_check == "Died":
                             life_form.entity_remove()
                             continue
-                    except KeyError:
-                        logger.debug(f"Missing entity: {life_form.life_form_id}")
+
+                        life_form.get_stats()
+
+                        # run a check here to ensure that an expired entity is not being processed, unless it is the
+                        # last entity - as after expiry of the final entity it will still loop one last time and
+                        # iterate over that final entity one last time
+                        if life_form.life_form_id == current_session.last_removal:
+                            if len(LifeForm.lifeforms.values()) > 1:
+                                raise Exception(f"Entity that expired this loop has been processed again")
+
+                        # some debug-like code to identify when a life form goes outside the LED board
+                        if life_form.matrix_position_x < 0 or \
+                                life_form.matrix_position_x > HATControl.u_width_max:
+                            raise Exception("Life form has exceeded x axis")
+                        if life_form.matrix_position_y < 0 or \
+                                life_form.matrix_position_y > HATControl.u_height_max:
+                            raise Exception("Life form has exceeded y axis")
+
+                        # clear previous position in the buffer
+                        frame_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
+
+                        # write new position in the buffer
+                        frame_buffer_access.write_to_buffer(life_form.matrix_position_x, life_form.matrix_position_y,
+                                                            life_form.red_color, life_form.green_color,
+                                                            life_form.blue_color)
+
+                        life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
+
+                # if the main list of entities is empty then all have expired; the program displays final information
+                # about the programs run and exits; unless retry mode is active, then a new set of entities are created
+                # and the simulation starts fresh with the same initial configuration
+                elif not LifeForm.lifeforms.values():
+                    if current_session.retries:
+                        current_session.highest_concurrent_lifeforms = 0
+                        current_session.current_layer = 0
+                        current_session.last_removal = -1
+
+                        for n in range(args.life_form_total):
+                            class_generator(n)
+
                         continue
+                    else:
+                        logger.info(
+                            f'\n All Lifeforms have expired.\n Total life forms produced: '
+                            f'{current_session.life_form_total_count}\n '
+                            f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
+                        break
 
-                    current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
-                    # if the current number of active life forms is higher than the previous record of concurrent
-                    # life forms, update the concurrent life forms variable
-                    if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
-                        current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
-                    status_check = life_form.movement()
+                logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
 
-                    # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
-                    # the holder to be modified it may loop through dead entities until the while loop above the for
-                    # loop iterates again with the fresh holder
-                    if status_check == "Dead":
-                        continue
-                    elif status_check == "Died":
-                        life_form.entity_remove()
-                        continue
-
-                    life_form.get_stats()
-
-                    # run a check here to ensure that an expired entity is not being processed, unless it is the last
-                    # entity - as after expiry of the final entity it will still loop one last time and iterate over
-                    # that final entity one last time
-                    if life_form.life_form_id == current_session.last_removal:
-                        if len(LifeForm.lifeforms.values()) > 1:
-                            raise Exception(f"Entity that expired this loop has been processed again")
-
-                    # some debug-like code to identify when a life form goes outside the LED board
-                    if life_form.matrix_position_x < 0 or \
-                            life_form.matrix_position_x > u_width_max:
-                        raise Exception("Life form has exceeded x axis")
-                    if life_form.matrix_position_y < 0 or \
-                            life_form.matrix_position_y > u_height_max:
-                        raise Exception("Life form has exceeded y axis")
-
-                    draw_leds(life_form.matrix_position_x, life_form.matrix_position_y,
-                              life_form.red_color, life_form.green_color,
-                              life_form.blue_color, current_session.current_layer)
-
-            # if the main list of entities is empty then all have expired; the program displays final information
-            # about the programs run and exits; unless retry mode is active, then a new set of entities are created
-            # and the simulation starts fresh with the same initial configuration
-            elif not LifeForm.lifeforms.values():
-                if current_session.retries:
-                    current_session.highest_concurrent_lifeforms = 0
-                    current_session.current_layer = 0
-                    current_session.last_removal = -1
-
-                    for n in range(args.life_form_total):
-                        class_generator(n)
-
-                    continue
-                else:
-                    logger.info(
-                        f'\n All Lifeforms have expired.\n Total life forms produced: '
-                        f'{current_session.life_form_total_count}\n '
-                        f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
-                    break
-
-            logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
-
-            unicorn.show()
-
-            time.sleep(args.loop_speed)
+                next_frame = time() + frame_refresh_delay_ms
 
     # upon keyboard interrupt display information about the program run before exiting
     except KeyboardInterrupt:
@@ -910,7 +874,7 @@ def main():
             f'concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n Last count of active '
             f'Lifeforms: {current_session.current_life_form_amount}')
         if args.hat_edition == "HD":
-            unicorn.off()
+            HATControl.unicorn.off()
 
 
 if __name__ == '__main__':
@@ -919,10 +883,12 @@ if __name__ == '__main__':
     parser.add_argument('-ilc', '--initial-lifeforms-count', action="store", dest="life_form_total", type=int,
                         default=initial_lifeforms_count,
                         help='Number of lifeforms to start with')
-
-    parser.add_argument('-s', '--speed', action="store", dest="loop_speed", type=float,
-                        default=speed,
-                        help='Time for the loop delay, essentially the game-speed (although, lower; faster)')
+    # todo: add sync
+    parser.add_argument('-s', '--refresh-rate', action="store", dest="loop_speed", type=float,
+                        default=hat_buffer_refresh_rate,
+                        help='The refresh rate for the buffer processing, also sets a maximum speed for the main loop '
+                             'processing, if sync is enabled (this is to prevent the display falling behind the logic '
+                             'loop)')
 
     parser.add_argument('-p', '--population-limit', action="store", dest="pop_limit", type=int,
                         default=population_limit,
@@ -994,59 +960,15 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    if args.simulator:
-        from unicorn_hat_sim import UnicornHatSim
-
-        from unicorn_hat_sim import unicornhat as unicorn
-        from unicorn_hat_sim import unicornhathd as unicornhd
-        from unicorn_hat_sim import unicornphat as UnicornHATMini
-
-        simulator_refresh = True
-
-    if args.hat_edition == "MINI":
-        # unicorn hat mini setup
-        # todo: figure out why this doesn't work with the phat simulator
-        try:
-            unicorn = UnicornHATMini()
-            unicorn.set_brightness(led_brightness)
-            unicorn.set_rotation(0)
-        except TypeError:
-            unicorn = UnicornHATMini
-    elif args.hat_edition == "SD":
-        # unicorn hat + unicorn hat hd setup
-        unicorn.set_layout(unicorn.AUTO)
-        unicorn.brightness(led_brightness)
-        unicorn.rotation(0)
-    elif args.hat_edition == "HD":
-        # unicorn hat + unicorn hat hd setup
-        unicorn = unicornhd
-        unicorn.set_layout(unicorn.AUTO)
-        unicorn.brightness(led_brightness)
-        unicorn.rotation(270)
-    elif args.hat_edition == "CUSTOM":
-        # unicorn hat + unicorn hat hd setup
-        try:
-            unicorn = UnicornHatSim(args.custom_size_simulator[0], args.custom_size_simulator[1], 180)
-        except NameError:
-            logger.info(f"Custom mode set without simulator mode on, defaulting to HD physical HAT")
-            unicorn = unicornhd
-            args.hat_edition = "HD"
-        unicorn.set_layout(unicorn.AUTO)
-        unicorn.brightness(led_brightness)
-        unicorn.rotation(0)
-        simulator_refresh = True
-
-    u_width, u_height = unicorn.get_shape()
-    # the unicorn hat led addresses are 0 indexed so need to account for this
-    u_width_max = u_width - 1
-    u_height_max = u_height - 1
+    HATControl = HATController(hat_edition=args.hat_edition, simulator=args.simulator,
+                               custom_size_simulator=args.custom_size_simulator, led_brightness=led_brightness)
 
     # generate list of all width and height positions for use in shuffling later
     # generate the lists dynamically from the raw width and height of the board to ensure the lists are
     # zero-indexed which is what is required for the LED drawing x, y positions
     board_list = []
-    for x_position in range(u_width):
-        for y_position in range(u_height):
+    for x_position in range(HATControl.u_width):
+        for y_position in range(HATControl.u_height):
             board_list.append((x_position, y_position))
 
     # setup Minecraft connection if mc_mode is True
@@ -1061,4 +983,6 @@ if __name__ == '__main__':
     for i in range(args.life_form_total):
         class_generator(i)
 
-    main()
+    Thread(target=main, daemon=True).start()
+
+    ScreenDrawer(hat_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate)
