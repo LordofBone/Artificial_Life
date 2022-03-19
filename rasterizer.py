@@ -18,6 +18,14 @@ class PreBuffer:
     def write_to_buffer(self, pixel_coord, pixel_rgb):
         self.pre_buffer[pixel_coord] = pixel_rgb
 
+    def check_buffer_position(self, pixel_coord):
+        try:
+            pixel_out = self.pre_buffer[pixel_coord]
+            if pixel_out == (0, 0, 0):
+                return pixel_coord
+        except KeyError:
+            return
+
     def clear_buffer_pixel(self, coord):
         self.pre_buffer[coord] = self.blank_pixel
 

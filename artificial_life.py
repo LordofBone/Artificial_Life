@@ -188,7 +188,7 @@ class LifeForm:
                             dna_transfer_capsule = {'transfer_dna_1': 0, 'transfer_dna_2': 0,
                                                     'transfer_dna_3': 0}
 
-                            for key, values in dna_transfer_capsule.items():
+                            for key in dna_transfer_capsule.keys():
 
                                 dna_chaos = random.randint(1, 100)
                                 if dna_chaos <= args.dna_chaos:
@@ -506,15 +506,10 @@ class LifeForm:
         """
         Creates a list of all x, y points around the entity
         """
-        self.positions_around_life_form = [self.get_position_up(), self.get_position_down(), self.get_position_left(),
+        self.positions_around_life_form = (self.get_position_up(), self.get_position_down(), self.get_position_left(),
                                            self.get_position_right(), self.get_position_up_and_right(),
                                            self.get_position_up_and_left(), self.get_position_down_and_left(),
-                                           self.get_position_down_and_right()]
-
-        self.positions_around_life_form = list(filter(None, self.positions_around_life_form))
-
-        # shuffle the position list to prevent the same directions being favoured each time
-        random.shuffle(self.positions_around_life_form)
+                                           self.get_position_down_and_right())
 
     def board_position_generator(self, surrounding_area=False):
         """
@@ -524,76 +519,42 @@ class LifeForm:
         if surrounding_area:
             # check area around entity for other life forms using above list
             if args.spawn_collision_detection:
-                used_coords = []
 
-                for life_form in LifeForm.lifeforms.copy().values():
-                    s_item_x = life_form.matrix_position_x
-                    s_item_y = life_form.matrix_position_y
-
-                    used_coords.append((s_item_x, s_item_y))
-
-                free_coords = set(self.positions_around_life_form).difference(set(used_coords))
+                free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
+                                                self.positions_around_life_form) if x)
 
                 try:
-                    random_free_coord = random.choice(list(free_coords))
+                    random_free_coord = random.choice(free_coords)
                 except IndexError:
                     # if no free space is found return None
                     return None
 
-                post_x_gen = random_free_coord[0]
-                post_y_gen = random_free_coord[1]
-
-                tester = post_x_gen, post_y_gen
-
-                if tester in used_coords:
-                    raise Exception(f"Co-ordinate: {tester} clashes with used co-ords: {used_coords}")
-
-                logger.debug(f"Free space around the entity found: X: {post_x_gen}, Y: {post_y_gen}")
+                logger.debug(f"Free space around the entity found: {random_free_coord}")
                 # if no other entity is in this location return the co-ords
-                return post_x_gen, post_y_gen
+                return random_free_coord[0], random_free_coord[1]
             else:
                 # with no collision detection enabled just choose a random spot
                 positions = random.choice(self.positions_around_life_form)
-                post_x_gen = positions[0]
-                post_y_gen = positions[1]
 
-                return post_x_gen, post_y_gen
+                return positions[0], positions[1]
 
         else:
             # with collision detection determine if a spot on the board contains a life form
             if args.spawn_collision_detection:
-                post_x_gen = None
-                post_y_gen = None
+                free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
+                                                pre_buffer_access.pre_buffer) if x)
 
-                # loop through all entity classes to determine locations
                 try:
-                    used_coords = []
+                    random_free_coord = random.choice(free_coords)
+                except IndexError:
+                    # if no free space is found return None
+                    return None
 
-                    for life_form in LifeForm.lifeforms.copy().values():
-                        s_item_x = life_form.matrix_position_x
-                        s_item_y = life_form.matrix_position_y
-                        used_coords.append((s_item_x, s_item_y))
-
-                    free_coords = set(board_list).difference(set(used_coords))
-
-                    try:
-                        random_free_coord = random.choice(list(free_coords))
-                    except IndexError:
-                        # if no free space is found return None
-                        return None
-
-                    post_x_gen = random_free_coord[0]
-                    post_y_gen = random_free_coord[1]
-
-                # if this is the first entity being created then return random positions as there is nothing to loop
-                # through and therefore nothing on the board to collide with
-                except NameError:
-                    return post_x_gen, post_y_gen
-                # return None if no free spaces are available
-                return post_x_gen, post_y_gen
-            # if no collision detection just return random x, y co-ords
+                logger.debug(f"Free space around the entity found: {random_free_coord}")
+                # if no other entity is in this location return the co-ords
+                return random_free_coord[0], random_free_coord[1]
             else:
-                # if collision detection not enabled then choose from anywhere on the board
+                # with no collision detection enabled just choose a random spot
                 post_x_gen = random.randint(0, HATControl.u_width_max)
                 post_y_gen = random.randint(0, HATControl.u_height_max)
 
@@ -839,7 +800,7 @@ def main():
                         # write new position in the buffer
                         pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
                                                           (life_form.red_color, life_form.green_color,
-                                                          life_form.blue_color))
+                                                           life_form.blue_color))
 
                         life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
 
