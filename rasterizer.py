@@ -1,6 +1,6 @@
 from time import time
 import logging
-from shaders import Shaders
+from shaders import ConfigurableShader, ShaderStack
 
 logger = logging.getLogger("rasterizer-logger")
 
@@ -30,12 +30,13 @@ class FrameBuffer:
         self.current_buffer_front = True
         self.blank_pixel = (0, 0, 0)
 
-        self.buffer_width = buffer_width
-        self.buffer_height = buffer_height
+        self.shader_stack = ShaderStack(buffer_width, buffer_height)
 
-        self.max_pixel_combine = buffer_width * buffer_height
+        # self.shader_stack.multi_shader_creator(input_shader=ConfigurableShader, number_of_shaders=2, base_number=4, base_addition=1020, base_rgb=(16, 16, 16))
 
-        self.shader = Shaders(self.max_pixel_combine)
+        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=8, shader_colour=(0, 8, 0)))
+        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=32, shader_colour=(8, 0, 0)))
+        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=4, shader_colour=(8, 8, 8)))
 
     def generate_buffers(self, width, height):
         for x_position in range(width):
@@ -44,11 +45,13 @@ class FrameBuffer:
                 self.back_buffer[(x_position, y_position)] = self.blank_pixel
 
     def write_to_buffer(self, pixel_coord, pixel_rgb):
-        pixel_rgb = self.shader.full_screen_shader_2(pixel_rgb)
+
+        shaded_pixel = self.shader_stack.run_shader_stack(pixel_rgb)
+
         if self.current_buffer_front:
-            self.front_buffer[pixel_coord] = pixel_rgb
+            self.front_buffer[pixel_coord] = shaded_pixel
         else:
-            self.back_buffer[pixel_coord] = pixel_rgb
+            self.back_buffer[pixel_coord] = shaded_pixel
 
     def get_from_buffer(self, pixel_coord):
         if self.current_buffer_front:
