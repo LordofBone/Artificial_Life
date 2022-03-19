@@ -10,11 +10,14 @@ class PreBuffer:
     def __init__(self):
         self.pre_buffer = {}
         self.blank_pixel = ((0, 0, 0), -1)
+        self.buffer_ready = False
 
     def generate_buffer(self, width, height):
         for x_position in range(width):
             for y_position in range(height):
                 self.pre_buffer[(x_position, y_position)] = self.blank_pixel
+
+        self.buffer_ready = True
 
     def write_to_buffer(self, pixel_coord, pixel_rgb, entity_id):
         self.pre_buffer[pixel_coord] = pixel_rgb, entity_id
