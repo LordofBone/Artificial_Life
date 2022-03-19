@@ -5,23 +5,30 @@ from shaders import ConfigurableShader, ShaderStack
 logger = logging.getLogger("rasterizer-logger")
 
 
+# todo: move the pre-buffer into artificial_life.py ?
 class PreBuffer:
     def __init__(self):
         self.pre_buffer = {}
-        self.blank_pixel = (0, 0, 0)
+        self.blank_pixel = ((0, 0, 0), -1)
 
     def generate_buffer(self, width, height):
         for x_position in range(width):
             for y_position in range(height):
                 self.pre_buffer[(x_position, y_position)] = self.blank_pixel
 
-    def write_to_buffer(self, pixel_coord, pixel_rgb):
-        self.pre_buffer[pixel_coord] = pixel_rgb
+    def write_to_buffer(self, pixel_coord, pixel_rgb, entity_id):
+        self.pre_buffer[pixel_coord] = pixel_rgb, entity_id
+
+    def get_from_buffer(self, pixel_coord):
+        pixel_rgb = self.pre_buffer[pixel_coord]
+
+        if not pixel_rgb[0] == (0, 0, 0):
+            return pixel_rgb[1]
 
     def check_buffer_position(self, pixel_coord):
         try:
             pixel_out = self.pre_buffer[pixel_coord]
-            if pixel_out == (0, 0, 0):
+            if pixel_out == ((0, 0, 0), -1):
                 return pixel_coord
         except KeyError:
             return
@@ -90,7 +97,7 @@ class ScreenDrawer:
 
             if time() > next_frame:
                 for coord, pixel in pre_buffer_access.pre_buffer.items():
-                    self.frame_buffer_access.write_to_buffer(coord, pixel)
+                    self.frame_buffer_access.write_to_buffer(coord, pixel[0])
                     final_pixel = self.frame_buffer_access.get_from_buffer(coord)
                     self.hat_control.draw_pixels(coord, final_pixel)
 

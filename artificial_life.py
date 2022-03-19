@@ -115,7 +115,7 @@ class LifeForm:
         self.lifeforms.update({self.life_form_id: self})
 
         pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
-                                          (self.red_color, self.green_color, self.blue_color))
+                                          (self.red_color, self.green_color, self.blue_color), self.life_form_id)
 
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
@@ -242,6 +242,7 @@ class LifeForm:
     def combat(self, other_life_form_id):
         # if the other entities' aggression factor is lower it will be killed and removed from the
         # main loops list of entities
+
         if LifeForm.lifeforms[other_life_form_id].aggression_factor < self.aggression_factor:
             logger.debug('Other entity killed')
 
@@ -476,11 +477,12 @@ class LifeForm:
         entity from the board entirely and blank it on top of the alive check that will skip it, to double ensure a
         dead entity is no longer interacted with during a loop that it died in.
         """
-        self.matrix_position_x = -100
-        self.matrix_position_y = -100
-        self.red_color = 0
-        self.green_color = 0
-        self.blue_color = 0
+        pre_buffer_access.clear_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+        # self.matrix_position_x = -100
+        # self.matrix_position_y = -100
+        # self.red_color = 0
+        # self.green_color = 0
+        # self.blue_color = 0
         self.alive = False
         current_session.last_removal = self.life_form_id
         del LifeForm.lifeforms[self.life_form_id]
@@ -516,49 +518,26 @@ class LifeForm:
         Get board positions for new entities, allows for collision detection, either choosing from across the whole
         board or in the immediate area around a life form (determined by the life_form_id variable passed in).
         """
-        if surrounding_area:
-            # check area around entity for other life forms using above list
-            if args.spawn_collision_detection:
+        # check area around entity for other life forms
+        if args.spawn_collision_detection:
 
-                free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
-                                                self.positions_around_life_form) if x)
+            free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
+                                            self.positions_around_life_form) if x)
 
-                try:
-                    random_free_coord = random.choice(free_coords)
-                except IndexError:
-                    # if no free space is found return None
-                    return None
+            try:
+                random_free_coord = random.choice(free_coords)
+            except IndexError:
+                # if no free space is found return None
+                return None
 
-                logger.debug(f"Free space around the entity found: {random_free_coord}")
-                # if no other entity is in this location return the co-ords
-                return random_free_coord[0], random_free_coord[1]
-            else:
-                # with no collision detection enabled just choose a random spot
-                positions = random.choice(self.positions_around_life_form)
-
-                return positions[0], positions[1]
-
+            logger.debug(f"Free space around the entity found: {random_free_coord}")
+            # if no other entity is in this location return the co-ords
+            return random_free_coord[0], random_free_coord[1]
         else:
-            # with collision detection determine if a spot on the board contains a life form
-            if args.spawn_collision_detection:
-                free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
-                                                pre_buffer_access.pre_buffer) if x)
+            # with no collision detection enabled just choose a random spot
+            positions = random.choice(self.positions_around_life_form)
 
-                try:
-                    random_free_coord = random.choice(free_coords)
-                except IndexError:
-                    # if no free space is found return None
-                    return None
-
-                logger.debug(f"Free space around the entity found: {random_free_coord}")
-                # if no other entity is in this location return the co-ords
-                return random_free_coord[0], random_free_coord[1]
-            else:
-                # with no collision detection enabled just choose a random spot
-                post_x_gen = random.randint(0, HATControl.u_width_max)
-                post_y_gen = random.randint(0, HATControl.u_height_max)
-
-                return post_x_gen, post_y_gen
+            return positions[0], positions[1]
 
     def collision_detector(self):
         """
@@ -620,43 +599,53 @@ class LifeForm:
 
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
-        # todo: find a way to optimise this
-        for life_form in LifeForm.lifeforms.copy().values():
-            # split the items in the sub-list into separate variables for comparison
-            s_item_life_form_id = life_form.life_form_id
+        if self.direction == 'move_right':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())
 
-            # get locations of the current entity
-            s_item_x = life_form.matrix_position_x
-            s_item_y = life_form.matrix_position_y
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+        elif self.direction == 'move_left':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())
 
-            # using the direction of the current life form determine on next move if the life form were to collide with
-            # another, if so return the id of the other life form
-            if self.direction == 'move_right':
-                if self.get_position_right()[0] == s_item_x and self.get_position_right()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_left':
-                if self.get_position_left()[0] == s_item_x and self.get_position_left()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_down':
-                if self.get_position_down()[0] == s_item_x and self.get_position_down()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_up':
-                if self.get_position_up()[0] == s_item_x and self.get_position_up()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_down_and_right':
-                if self.get_position_down_and_right()[0] == s_item_x and \
-                        self.get_position_down_and_right()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_up_and_left':
-                if self.get_position_up_and_left()[0] == s_item_x and self.get_position_up_and_left()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_down_and_left':
-                if self.get_position_down_and_left()[0] == s_item_x and \
-                        self.get_position_down_and_left()[1] == s_item_y:
-                    return True, s_item_life_form_id
-            elif self.direction == 'move_up_and_right':
-                if self.get_position_up_and_right()[0] == s_item_x and self.get_position_up_and_right()[1] == s_item_y:
-                    return True, s_item_life_form_id
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_down':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_up':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_down_and_right':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_up_and_left':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_down_and_left':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
+        elif self.direction == 'move_up_and_right':
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_right())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id
+
         return False, None
 
     def combine_entities(self, life_form_2):
@@ -672,6 +661,28 @@ class LifeForm:
                 LifeForm.lifeforms[life_form_2].direction = self.direction
             else:
                 logger.debug('Neither entity killed')
+
+
+def global_board_generator():
+    # with collision detection determine if a spot on the board contains a life form
+    if args.spawn_collision_detection:
+        free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
+                                        pre_buffer_access.pre_buffer) if x)
+        try:
+            random_free_coord = random.choice(free_coords)
+        except IndexError:
+            # if no free space is found return None
+            return None
+
+        logger.debug(f"Free space around the entity found: {random_free_coord}")
+        # if no other entity is in this location return the co-ords
+        return random_free_coord[0], random_free_coord[1]
+    else:
+        # with no collision detection enabled just choose a random spot
+        post_x_gen = random.randint(0, HATControl.u_width_max)
+        post_y_gen = random.randint(0, HATControl.u_height_max)
+
+        return post_x_gen, post_y_gen
 
 
 def percentage(percent, whole):
@@ -709,14 +720,11 @@ def class_generator(life_form_id):
     life form life_form_ids assign a random x and y number for the position on the board and create the new life
     form with random seeds for each life seed generation.
     """
-    if not LifeForm.lifeforms.values():
-        starting_x = random.randint(0, HATControl.u_width_max)
-        starting_y = random.randint(0, HATControl.u_height_max)
-    else:
-        try:
-            starting_x, starting_y = LifeForm.lifeforms[0].board_position_generator()
-        except TypeError:
-            return
+    try:
+        starting_x, starting_y = global_board_generator()
+    except TypeError:
+        return
+
     LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
              start_x=starting_x, start_y=starting_y)
 
@@ -737,9 +745,9 @@ def main():
     """
     # wrap main loop into a try/catch to allow keyboard exit and cleanup
     try:
+        first_run = True
         next_frame = time() + frame_refresh_delay_ms
         while True:
-
             if time() > next_frame or not refresh_logic_link:
 
                 # check the list of entities has items within
@@ -749,6 +757,9 @@ def main():
                     current_session.current_layer += 1
                     # for each life_form_id in the list use the life_form_id of the life form to work from
                     for life_form in LifeForm.lifeforms.copy().values():
+
+                        # clear previous position in the buffer
+                        pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
 
                         # call expiry function for current life form and update the list of life forms
                         # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
@@ -794,13 +805,10 @@ def main():
                                 life_form.matrix_position_y > HATControl.u_height_max:
                             raise Exception("Life form has exceeded y axis")
 
-                        # clear previous position in the buffer
-                        pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
-
                         # write new position in the buffer
                         pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
                                                           (life_form.red_color, life_form.green_color,
-                                                           life_form.blue_color))
+                                                           life_form.blue_color), life_form.life_form_id)
 
                         life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
 
@@ -808,13 +816,19 @@ def main():
                 # about the programs run and exits; unless retry mode is active, then a new set of entities are created
                 # and the simulation starts fresh with the same initial configuration
                 elif not LifeForm.lifeforms.values():
-                    if current_session.retries:
+                    if first_run:
+                        [class_generator(i) for i in range(args.life_form_total)]
+
+                        first_run = False
+
+                        continue
+
+                    elif current_session.retries:
                         current_session.highest_concurrent_lifeforms = 0
                         current_session.current_layer = 0
                         current_session.last_removal = -1
 
-                        for n in range(args.life_form_total):
-                            class_generator(n)
+                        [class_generator(i) for i in range(args.life_form_total)]
 
                         continue
                     else:
@@ -939,9 +953,6 @@ if __name__ == '__main__':
 
     current_session = Session(life_form_total_count=args.life_form_total, draw_trails=args.trails_on,
                               retries=args.retry_on, highest_concurrent_lifeforms=args.life_form_total)
-
-    # generate life form classes
-    [class_generator(i) for i in range(args.life_form_total)]
 
     Thread(target=main, daemon=True).start()
 
