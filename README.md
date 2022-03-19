@@ -1,4 +1,6 @@
 ## Artificial Life
+### --Potential Flashing Images Warning--
+Various ways of running this code could cause flashing images, please be careful.
 
 This repository has the code for the Artificial Life project as described on the 
 [314reactor.com](https://314reactor.com/2017/10/16/artificial-life-project/) blog. 
