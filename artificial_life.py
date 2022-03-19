@@ -980,8 +980,7 @@ if __name__ == '__main__':
                               retries=args.retry_on, highest_concurrent_lifeforms=args.life_form_total)
 
     # generate life form classes
-    for i in range(args.life_form_total):
-        class_generator(i)
+    [class_generator(i) for i in range(args.life_form_total)]
 
     Thread(target=main, daemon=True).start()
 
