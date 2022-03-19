@@ -9,7 +9,8 @@ class ShaderStack:
         self.shader_stack[self.shader_id].max_coord_combine = self.max_pixel_combine
         self.shader_id += 1
 
-    def multi_shader_creator(self, input_shader, number_of_shaders=4, base_number=8, base_addition=2, base_rgb=(128, 128, 128)):
+    def multi_shader_creator(self, input_shader, number_of_shaders=4, base_number=8, base_addition=2,
+                             base_rgb=(128, 128, 128)):
         blank = False
 
         for i in range(number_of_shaders):
@@ -39,6 +40,7 @@ class ShaderStack:
         return pixel_in
 
 
+# WARNING: be careful with these, it can cause flashing images
 class ConfigurableShader:
     max_colour = 255
     max_coord_combine: int

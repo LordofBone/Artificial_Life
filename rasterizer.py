@@ -32,11 +32,9 @@ class FrameBuffer:
 
         self.shader_stack = ShaderStack(buffer_width, buffer_height)
 
-        # self.shader_stack.multi_shader_creator(input_shader=ConfigurableShader, number_of_shaders=2, base_number=4, base_addition=1020, base_rgb=(16, 16, 16))
-
-        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=8, shader_colour=(0, 8, 0)))
-        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=32, shader_colour=(8, 0, 0)))
-        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=4, shader_colour=(8, 8, 8)))
+        # WARNING: be careful with these, it can cause flashing images
+        # self.shader_stack.multi_shader_creator(input_shader=ConfigurableShader, number_of_shaders=2, base_number=4, base_addition=16, base_rgb=(16, 16, 16))
+        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=8, shader_colour=(0, 0, 0)))
 
     def generate_buffers(self, width, height):
         for x_position in range(width):
