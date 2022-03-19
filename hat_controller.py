@@ -66,16 +66,16 @@ class HATController:
         self.u_width_max = self.u_width - 1
         self.u_height_max = self.u_height - 1
 
-    def draw_pixels(self, x, y, r, g, b, current_layer=0):
+    def draw_pixels(self, pixel_coord, pixel_rgb, current_layer=0):
         """
         Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
         relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
         amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
         """
         try:
-            self.unicorn.set_pixel(x, y, r, g, b)
+            self.unicorn.set_pixel(pixel_coord[0], pixel_coord[1], pixel_rgb[0], pixel_rgb[1], pixel_rgb[2])
         except IndexError:
-            raise Exception(f"Set pixel did not like X:{x} Y:{y} R:{r} G:{g} B:{b}")
+            raise Exception(f"Set pixel did not like pixel coordinate: {pixel_coord} with RGB value: {pixel_rgb}")
         # todo: improve this greatly and move it out of this class/module
         # if args.mc_mode:
         #     player_x, player_y, player_z = mc.player.getPos()

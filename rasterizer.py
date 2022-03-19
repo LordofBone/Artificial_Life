@@ -5,12 +5,37 @@ from shaders import Shaders
 logger = logging.getLogger("rasterizer-logger")
 
 
-class FrameBuffer:
+class PreBuffer:
     def __init__(self):
+        self.pre_buffer = {}
+        self.blank_pixel = (0, 0, 0)
+
+    def generate_buffer(self, width, height):
+        for x_position in range(width):
+            for y_position in range(height):
+                self.pre_buffer[(x_position, y_position)] = self.blank_pixel
+
+    def write_to_buffer(self, pixel_coord, pixel_rgb):
+        self.pre_buffer[pixel_coord] = pixel_rgb
+
+    def clear_buffer_pixel(self, coord):
+        self.pre_buffer[coord] = self.blank_pixel
+
+
+class FrameBuffer:
+    def __init__(self, buffer_width, buffer_height):
         self.front_buffer = {}
         self.back_buffer = {}
+
         self.current_buffer_front = True
         self.blank_pixel = (0, 0, 0)
+
+        self.buffer_width = buffer_width
+        self.buffer_height = buffer_height
+
+        self.max_pixel_combine = buffer_width * buffer_height
+
+        self.shader = Shaders(self.max_pixel_combine)
 
     def generate_buffers(self, width, height):
         for x_position in range(width):
@@ -18,19 +43,23 @@ class FrameBuffer:
                 self.front_buffer[(x_position, y_position)] = self.blank_pixel
                 self.back_buffer[(x_position, y_position)] = self.blank_pixel
 
-    def write_to_buffer(self, x, y, r, g, b):
-        base_colour = (r, g, b)
+    def write_to_buffer(self, pixel_coord, pixel_rgb):
+        pixel_rgb = self.shader.full_screen_shader_2(pixel_rgb)
         if self.current_buffer_front:
-            self.front_buffer[(x, y)] = base_colour
+            self.front_buffer[pixel_coord] = pixel_rgb
         else:
-            self.back_buffer[(x, y)] = base_colour
+            self.back_buffer[pixel_coord] = pixel_rgb
+
+    def get_from_buffer(self, pixel_coord):
+        if self.current_buffer_front:
+            pixel_rgb = self.front_buffer[pixel_coord]
+        else:
+            pixel_rgb = self.back_buffer[pixel_coord]
+
+        return pixel_rgb
 
     def flip_buffers(self):
         self.current_buffer_front = not self.current_buffer_front
-
-    def clear_buffer_pixel(self, coord):
-        if self.current_buffer_front:
-            self.front_buffer[coord] = self.blank_pixel
 
 
 class ScreenDrawer:
@@ -39,14 +68,9 @@ class ScreenDrawer:
         self.frame_refresh_delay_ms = 1 / buffer_refresh
         logger.debug(f'Milliseconds per-frame to aim for: {self.frame_refresh_delay_ms}')
 
-        self.max_pixel_combine = self.hat_control.u_width_max * self.hat_control.u_height_max
+        self.frame_buffer_access = FrameBuffer(self.hat_control.u_width, self.hat_control.u_height)
 
-        frame_buffer_access.generate_buffers(self.hat_control.u_width, self.hat_control.u_height)
-
-        self.shader_access = Shaders(self.max_pixel_combine)
-
-        # todo: make this configurable by parameters.py and/or argsparse
-        self.gradient_background = True
+        pre_buffer_access.generate_buffer(self.hat_control.u_width, self.hat_control.u_height)
 
         self.draw()
 
@@ -56,22 +80,14 @@ class ScreenDrawer:
         while True:
 
             if time() > next_frame:
-                if frame_buffer_access.current_buffer_front:
-                    for coord, pixel in frame_buffer_access.front_buffer.items():
-                        if self.gradient_background:
-                            pixel = self.shader_access.full_screen_shader_gradient(coord, pixel)
-                        self.hat_control.draw_pixels(x=coord[0], y=coord[1], r=pixel[0], g=pixel[1],
-                                                     b=pixel[2])
-                else:
-                    for coord, pixel in frame_buffer_access.back_buffer.items():
-                        if self.gradient_background:
-                            pixel = self.shader_access.full_screen_shader_gradient(coord, pixel)
-                        self.hat_control.draw_pixels(x=coord[0], y=coord[1], r=pixel[0], g=pixel[1],
-                                                     b=pixel[2])
+                for coord, pixel in pre_buffer_access.pre_buffer.items():
+                    self.frame_buffer_access.write_to_buffer(coord, pixel)
+                    final_pixel = self.frame_buffer_access.get_from_buffer(coord)
+                    self.hat_control.draw_pixels(coord, final_pixel)
 
                 self.hat_control.unicorn.show()
 
                 next_frame = time() + self.frame_refresh_delay_ms
 
 
-frame_buffer_access = FrameBuffer()
+pre_buffer_access = PreBuffer()

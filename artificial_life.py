@@ -10,7 +10,7 @@ from mcpi.minecraft import Minecraft
 
 from hat_controller import HATController
 
-from rasterizer import ScreenDrawer, frame_buffer_access
+from rasterizer import ScreenDrawer, pre_buffer_access
 
 from threading import Thread
 
@@ -114,8 +114,8 @@ class LifeForm:
 
         self.lifeforms.update({self.life_form_id: self})
 
-        frame_buffer_access.write_to_buffer(self.matrix_position_x, self.matrix_position_y,
-                                            self.red_color, self.green_color, self.blue_color)
+        pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
+                                          (self.red_color, self.green_color, self.blue_color))
 
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
@@ -834,12 +834,12 @@ def main():
                             raise Exception("Life form has exceeded y axis")
 
                         # clear previous position in the buffer
-                        frame_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
+                        pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
 
                         # write new position in the buffer
-                        frame_buffer_access.write_to_buffer(life_form.matrix_position_x, life_form.matrix_position_y,
-                                                            life_form.red_color, life_form.green_color,
-                                                            life_form.blue_color)
+                        pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
+                                                          (life_form.red_color, life_form.green_color,
+                                                          life_form.blue_color))
 
                         life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
 

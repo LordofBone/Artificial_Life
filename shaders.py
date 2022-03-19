@@ -1,23 +1,25 @@
-
 class Shaders:
-    def __init__(self, max_coord_combine):
-        self.max_colour = 255
-        self.base_red = (128, 0, 0)
-        self.base_green = (0, 128, 0)
-        self.base_blue = (0, 0, 128)
-        self.base_white = (128, 128, 128)
-        self.super_red = (255, 0, 0)
-        self.super_green = (0, 255, 0)
-        self.super_blue = (0, 0, 255)
-        self.super_white = (255, 255, 255)
+    max_colour = 255
+    base_red = (128, 0, 0)
+    base_green = (0, 128, 0)
+    base_blue = (0, 0, 128)
+    base_white = (128, 128, 128)
+    super_red = (255, 0, 0)
+    super_green = (0, 255, 0)
+    super_blue = (0, 0, 255)
+    super_white = (255, 255, 255)
 
+    def __init__(self, max_coord_combine, count_number=0, count_number_max=32, count_number_step_up=1, count_number_step_down=1, addition_shader=True, invert_count=True):
         self.max_coord_combine = max_coord_combine
 
-        self.count_number = 0
-        self.count_number_max = 256
+        self.count_number = count_number
+        self.count_number_max = count_number_max
 
-        self.addition_shader = True
-        self.invert_count = True
+        self.count_number_step_up = count_number_step_up
+        self.count_number_step_down = count_number_step_down
+
+        self.addition_shader = addition_shader
+        self.invert_count = invert_count
 
     # thanks to
     # https://stackoverflow.com/questions/52992900/how-to-blend-two-rgb-colors-front-and-back-based-on-their-alpha-channels
@@ -49,7 +51,7 @@ class Shaders:
 
     def number_count_step_plus(self):
         if self.count_number < self.count_number_max:
-            self.count_number += 1
+            self.count_number += self.count_number_step_up
         else:
             if self.invert_count:
                 self.addition_shader = not self.addition_shader
@@ -58,7 +60,7 @@ class Shaders:
 
     def number_count_step_minus(self):
         if self.count_number > 0:
-            self.count_number -= 1
+            self.count_number -= self.count_number_step_down
         else:
             if self.invert_count:
                 self.addition_shader = not self.addition_shader
