@@ -762,7 +762,7 @@ def main():
     first_run = True
     next_frame = time() + frame_refresh_delay_ms
     while True:
-        if time() > next_frame or not refresh_logic_link:
+        if time() > next_frame or not refresh_logic_link and pre_buffer_access.buffer_ready:
 
             # check the list of entities has items within
             if LifeForm.lifeforms.values():
