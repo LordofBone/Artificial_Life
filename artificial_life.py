@@ -4,7 +4,7 @@ import random
 
 from time import time
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from mcpi.minecraft import Minecraft
 
@@ -14,9 +14,8 @@ from rasterizer import ScreenDrawer, pre_buffer_access
 
 from threading import Thread
 
-from config.parameters import initial_lifeforms_count, population_limit, max_time_to_live, max_aggression, \
-    logging_level, max_breed_threshold, dna_chaos_chance, static_entity_chance, max_time_to_move, led_brightness, \
-    combine_threshold, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link
+from config.parameters import initial_lifeforms_count, population_limit, logging_level, dna_chaos_chance, \
+    led_brightness, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number
 
 logger = logging.getLogger("alife-logger")
 
@@ -34,9 +33,14 @@ class Session:
     current_layer: int = 0
     current_life_form_amount: int = 0
     life_form_total_count: int = 0
-    directions: list = field(
-        default_factory=lambda: ['move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                                 'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still'])
+
+    def __post_init__(self):
+        if args.gravity:
+            self.directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
+                               'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
+        else:
+            self.directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
+                               'move_down_and_left', 'move_up_and_left', 'move_down_and_right')
 
 
 class LifeForm:
@@ -76,30 +80,40 @@ class LifeForm:
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
         self.red_color = random.randint(1, 255)
-        self.max_aggression_factor = random.randint(1, args.max_aggro)
-        self.direction_pre_choice = random.choice(current_session.directions)
-        self.max_life = random.randint(1, args.max_ttl)
-        self.breed_threshold = random.randint(0, args.max_breed)
+        self.breed_threshold = random.randint(0, args.max_num)
+        self.combine_threshold = random.randint(0, args.max_num)
+
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
         self.green_color = random.randint(1, 255)
-        self.aggression_factor = random.randint(0, self.max_aggression_factor)
-        self.time_to_move = random.randint(1, args.max_moves)
+        self.aggression_factor = random.randint(0, args.max_num)
+        self.time_to_move = random.randint(1, args.max_num)
         self.time_to_move_count = self.time_to_move
+
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
         random.seed(self.life_seed3)
         self.blue_color = random.randint(1, 255)
-        self.time_to_live = random.randint(0, self.max_life)
+        self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
-        self.moving_life_form_percent = random.randint(1, 100)
-        if self.moving_life_form_percent <= args.static_entity:
-            self.moving_life_form = False
-            self.direction = 'still'
+        # todo: find a better way to deal with still entities when gravity is off, otherwise everything just comes to
+        #  a halt
+        if args.gravity:
+            self.static_entity_chance = random.randint(1, 100)
+            self.moving_life_form_percent = random.randint(1, 100)
+            if self.moving_life_form_percent <= self.static_entity_chance:
+                self.moving_life_form = False
+                self.direction = 'still'
+            else:
+                self.moving_life_form = True
+                self.direction = random.choice(current_session.directions)
         else:
             self.moving_life_form = True
-            self.direction = self.direction_pre_choice
+            self.direction = random.choice(current_session.directions)
+
+        self.preferred_direction = self.direction
+
         # reset the global random seed
         random.seed()
 
@@ -172,7 +186,7 @@ class LifeForm:
                         if current_session.current_life_form_amount < args.pop_limit:
                             # find a place for the new entity to spawn around the current parent life form
                             try:
-                                post_x_gen, post_y_gen = self.board_position_generator(surrounding_area=True)
+                                post_x_gen, post_y_gen = self.board_position_generator()
                             except TypeError:
                                 logger.debug("No space available for a spawn of a new life form")
 
@@ -291,6 +305,7 @@ class LifeForm:
         logger.debug(f'Seed 1: {self.life_seed1}')
         logger.debug(f'Seed 2: {self.life_seed2}')
         logger.debug(f'Seed 3: {self.life_seed3}')
+        logger.debug(f'Preferred Direction: {self.preferred_direction}')
         logger.debug(f'Direction: {self.direction}')
         logger.debug(f'Time to move total: {self.time_to_move}')
         logger.debug(f'Time to next move: {self.time_to_move_count}')
@@ -439,16 +454,20 @@ class LifeForm:
             exclusion_list = []
         if self.direction not in exclusion_list:
             exclusion_list.append(self.direction)
-        try:
-            if self.moving_life_form:
-                r = random.choice([d for d in current_session.directions if d not in exclusion_list])
-                if r in exclusion_list:
-                    raise Exception(f"Direction: {r} found in exclusion list: {exclusion_list}")
-            else:
-                r = 'still'
-            self.direction = r
-        except IndexError:
-            r = False
+        if self.preferred_direction not in exclusion_list:
+            r = self.preferred_direction
+        else:
+            try:
+                if self.moving_life_form:
+                    r = random.choice([d for d in current_session.directions if d not in exclusion_list])
+                    if r in exclusion_list:
+                        raise Exception(f"Direction: {r} found in exclusion list: {exclusion_list}")
+                else:
+                    r = 'still'
+                self.direction = r
+            except IndexError:
+                r = False
+
         logger.debug(f"New direction: {r} with exclusion list: {exclusion_list}")
         return r
 
@@ -478,11 +497,6 @@ class LifeForm:
         dead entity is no longer interacted with during a loop that it died in.
         """
         pre_buffer_access.clear_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
-        # self.matrix_position_x = -100
-        # self.matrix_position_y = -100
-        # self.red_color = 0
-        # self.green_color = 0
-        # self.blue_color = 0
         self.alive = False
         current_session.last_removal = self.life_form_id
         del LifeForm.lifeforms[self.life_form_id]
@@ -513,7 +527,7 @@ class LifeForm:
                                            self.get_position_up_and_left(), self.get_position_down_and_left(),
                                            self.get_position_down_and_right())
 
-    def board_position_generator(self, surrounding_area=False):
+    def board_position_generator(self):
         """
         Get board positions for new entities, allows for collision detection, either choosing from across the whole
         board or in the immediate area around a life form (determined by the life_form_id variable passed in).
@@ -654,8 +668,8 @@ class LifeForm:
         If the aggression factor of both entities is within the combine_threshold range they will reach a stalemate and
         simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
         """
-        if self.aggression_factor + args.combine_threshold > \
-                LifeForm.lifeforms[life_form_2].aggression_factor > self.aggression_factor - args.combine_threshold:
+        if self.aggression_factor + self.combine_threshold > \
+                LifeForm.lifeforms[life_form_2].aggression_factor > self.aggression_factor - self.combine_threshold:
             if args.combine_mode:
                 logger.debug(f'Entity: {self.life_form_id} combined with: {life_form_2}')
                 LifeForm.lifeforms[life_form_2].linked(life_form_id=self.life_form_id)
@@ -745,116 +759,109 @@ def main():
     Main loop where all life form movement and interaction takes place
     """
     # wrap main loop into a try/catch to allow keyboard exit and cleanup
-    try:
-        first_run = True
-        next_frame = time() + frame_refresh_delay_ms
-        while True:
-            if time() > next_frame or not refresh_logic_link and pre_buffer_access.buffer_ready:
+    first_run = True
+    next_frame = time() + frame_refresh_delay_ms
+    while True:
+        if time() > next_frame or not refresh_logic_link:
 
-                # check the list of entities has items within
-                if LifeForm.lifeforms.values():
-                    # for time the current set of life forms is processed increase the layer for minecraft to set blocks
-                    # on by 1
-                    current_session.current_layer += 1
-                    # for each life_form_id in the list use the life_form_id of the life form to work from
-                    for life_form in LifeForm.lifeforms.copy().values():
+            # check the list of entities has items within
+            if LifeForm.lifeforms.values():
+                # for time the current set of life forms is processed increase the layer for minecraft to set blocks
+                # on by 1
+                current_session.current_layer += 1
+                # for each life_form_id in the list use the life_form_id of the life form to work from
+                for life_form in LifeForm.lifeforms.copy().values():
 
-                        # clear previous position in the buffer
-                        pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
+                    # clear previous position in the buffer
+                    pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
 
-                        # call expiry function for current life form and update the list of life forms
-                        # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
-                        try:
-                            expired = life_form.expire_entity()
-                            if expired:
-                                life_form.entity_remove()
-                                continue
-                        except KeyError:
-                            logger.debug(f"Missing entity: {life_form.life_form_id}")
-                            continue
-
-                        current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
-                        # if the current number of active life forms is higher than the previous record of concurrent
-                        # life forms, update the concurrent life forms variable
-                        if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
-                            current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
-                        status_check = life_form.movement()
-
-                        # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
-                        # the holder to be modified it may loop through dead entities until the while loop above the for
-                        # loop iterates again with the fresh holder
-                        if status_check == "Dead":
-                            continue
-                        elif status_check == "Died":
+                    # call expiry function for current life form and update the list of life forms
+                    # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
+                    try:
+                        expired = life_form.expire_entity()
+                        if expired:
                             life_form.entity_remove()
                             continue
-
-                        life_form.get_stats()
-
-                        # run a check here to ensure that an expired entity is not being processed, unless it is the
-                        # last entity - as after expiry of the final entity it will still loop one last time and
-                        # iterate over that final entity one last time
-                        if life_form.life_form_id == current_session.last_removal:
-                            if len(LifeForm.lifeforms.values()) > 1:
-                                raise Exception(f"Entity that expired this loop has been processed again")
-
-                        # some debug-like code to identify when a life form goes outside the LED board
-                        if life_form.matrix_position_x < 0 or \
-                                life_form.matrix_position_x > HATControl.u_width_max:
-                            raise Exception("Life form has exceeded x axis")
-                        if life_form.matrix_position_y < 0 or \
-                                life_form.matrix_position_y > HATControl.u_height_max:
-                            raise Exception("Life form has exceeded y axis")
-
-                        # write new position in the buffer
-                        pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
-                                                          (life_form.red_color, life_form.green_color,
-                                                           life_form.blue_color), life_form.life_form_id)
-
-                        life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
-
-                # if the main list of entities is empty then all have expired; the program displays final information
-                # about the programs run and exits; unless retry mode is active, then a new set of entities are created
-                # and the simulation starts fresh with the same initial configuration
-                elif not LifeForm.lifeforms.values():
-                    if first_run:
-                        [class_generator(i) for i in range(args.life_form_total)]
-
-                        first_run = False
-
+                    except KeyError:
+                        logger.debug(f"Missing entity: {life_form.life_form_id}")
                         continue
 
-                    elif current_session.retries:
-                        current_session.highest_concurrent_lifeforms = 0
-                        current_session.current_layer = 0
-                        current_session.last_removal = -1
+                    current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
+                    # if the current number of active life forms is higher than the previous record of concurrent
+                    # life forms, update the concurrent life forms variable
+                    if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
+                        current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
+                    status_check = life_form.movement()
 
-                        [class_generator(i) for i in range(args.life_form_total)]
-
+                    # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
+                    # the holder to be modified it may loop through dead entities until the while loop above the for
+                    # loop iterates again with the fresh holder
+                    if status_check == "Dead":
                         continue
-                    else:
-                        logger.info(
-                            f'\n All Lifeforms have expired.\n Total life forms produced: '
-                            f'{current_session.life_form_total_count}\n '
-                            f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
-                        break
+                    elif status_check == "Died":
+                        life_form.entity_remove()
+                        continue
 
-                logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
+                    life_form.get_stats()
 
-                next_frame = time() + frame_refresh_delay_ms
+                    # run a check here to ensure that an expired entity is not being processed, unless it is the
+                    # last entity - as after expiry of the final entity it will still loop one last time and
+                    # iterate over that final entity one last time
+                    if life_form.life_form_id == current_session.last_removal:
+                        if len(LifeForm.lifeforms.values()) > 1:
+                            raise Exception(f"Entity that expired this loop has been processed again")
 
-    # upon keyboard interrupt display information about the program run before exiting
-    except KeyboardInterrupt:
-        logger.info(
-            f'Program ended by user.\n Total life forms produced: {current_session.life_form_total_count}\n Max '
-            f'concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n Last count of active '
-            f'Lifeforms: {current_session.current_life_form_amount}')
-        if args.hat_edition == "HD":
-            HATControl.unicorn.off()
+                    # some debug-like code to identify when a life form goes outside the LED board
+                    if life_form.matrix_position_x < 0 or \
+                            life_form.matrix_position_x > HATControl.u_width_max:
+                        raise Exception("Life form has exceeded x axis")
+                    if life_form.matrix_position_y < 0 or \
+                            life_form.matrix_position_y > HATControl.u_height_max:
+                        raise Exception("Life form has exceeded y axis")
+
+                    # write new position in the buffer
+                    pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
+                                                      (life_form.red_color, life_form.green_color,
+                                                       life_form.blue_color), life_form.life_form_id)
+
+                    life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
+
+            # if the main list of entities is empty then all have expired; the program displays final information
+            # about the programs run and exits; unless retry mode is active, then a new set of entities are created
+            # and the simulation starts fresh with the same initial configuration
+            elif not LifeForm.lifeforms.values():
+                if first_run:
+                    [class_generator(i) for i in range(args.life_form_total)]
+
+                    first_run = False
+
+                    continue
+
+                elif current_session.retries:
+                    current_session.highest_concurrent_lifeforms = 0
+                    current_session.current_layer = 0
+                    current_session.last_removal = -1
+
+                    [class_generator(i) for i in range(args.life_form_total)]
+
+                    continue
+                else:
+                    logger.info(
+                        f'\n All Lifeforms have expired.\n Total life forms produced: '
+                        f'{current_session.life_form_total_count}\n '
+                        f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
+                    break
+
+            logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
+
+            next_frame = time() + frame_refresh_delay_ms
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Artificial Life')
+
+    parser.add_argument('-m', '--max-num', action="store_true", dest="max_num", default=max_trait_number,
+                        help='Maximum number possible for any entity traits')
 
     parser.add_argument('-ilc', '--initial-lifeforms-count', action="store", dest="life_form_total", type=int,
                         default=initial_lifeforms_count,
@@ -870,34 +877,9 @@ if __name__ == '__main__':
                         default=population_limit,
                         help='Limit of the population at any one time')
 
-    parser.add_argument('-ttl', '--max-ttl', action="store", dest="max_ttl", type=int,
-                        default=max_time_to_live,
-                        help='Maximum time to live possible for life forms')
-
-    parser.add_argument('-ma', '--max-aggression', action="store", dest="max_aggro", type=int,
-                        default=max_aggression,
-                        help='Maximum aggression factor possible for life forms')
-
-    parser.add_argument('-mb', '--max-breed-threshold', action="store", dest="max_breed", type=int,
-                        default=max_breed_threshold,
-                        help='Maximum breed threshold for entities')
-
     parser.add_argument('-dc', '--dna-chaos', action="store", dest="dna_chaos", type=int,
                         default=dna_chaos_chance,
                         help='Percentage chance of random DNA upon breeding of entities')
-
-    parser.add_argument('-se', '--static-entity', action="store", dest="static_entity", type=int,
-                        default=static_entity_chance,
-                        help='Percentage chance of an entity being static')
-
-    parser.add_argument('-mt', '--max-move-time', action="store", dest="max_moves", type=int,
-                        default=max_time_to_move,
-                        help='Maximum possible time to move number for entities')
-
-    parser.add_argument('-ct', '--combine-threshold', action="store", dest="combine_threshold", type=int,
-                        default=combine_threshold,
-                        help='If a life form collides with another and both of their aggression levels are within '
-                             'this range and combining is enabled, they will combine (move together)')
 
     parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", type=tuple,
                         default=hat_simulator_size,
@@ -939,14 +921,6 @@ if __name__ == '__main__':
     HATControl = HATController(hat_edition=args.hat_edition, simulator=args.simulator,
                                custom_size_simulator=args.custom_size_simulator, led_brightness=led_brightness)
 
-    # generate list of all width and height positions for use in shuffling later
-    # generate the lists dynamically from the raw width and height of the board to ensure the lists are
-    # zero-indexed which is what is required for the LED drawing x, y positions
-    board_list = []
-    for x_position in range(HATControl.u_width):
-        for y_position in range(HATControl.u_height):
-            board_list.append((x_position, y_position))
-
     # setup Minecraft connection if mc_mode is True
     if args.mc_mode:
         mc = Minecraft.create()
@@ -957,4 +931,4 @@ if __name__ == '__main__':
 
     Thread(target=main, daemon=True).start()
 
-    ScreenDrawer(hat_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate)
+    ScreenDrawer(hat_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session)
