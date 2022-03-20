@@ -1,14 +1,9 @@
+max_trait_number = 1000000
 initial_lifeforms_count = 10
 population_limit = 50
-max_time_to_live = 1000
-max_aggression = 1000
-max_time_to_move = 100
 logging_level = 'INFO'
-max_breed_threshold = 850
 dna_chaos_chance = 10
-static_entity_chance = 50
 led_brightness = 0.3
-combine_threshold = 25
 hat_model = "HD"
 hat_simulator_size = 64, 64
 hat_buffer_refresh_rate = 60
