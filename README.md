@@ -59,30 +59,19 @@ sudo env PATH="$PATH" python artificial_life.py
 Arguments that can be passed: 
 
 ```
+  -m, --max-num         Maximum number possible for any entity traits
   -ilc LIFE_FORM_TOTAL, --initial-lifeforms-count LIFE_FORM_TOTAL
                         Number of lifeforms to start with
-  -s LOOP_SPEED, --speed LOOP_SPEED
-                        Time for the loop delay, essentially the game-speed
-                        (although, lower; faster)
+  -s LOOP_SPEED, --refresh-rate LOOP_SPEED
+                        The refresh rate for the buffer processing, also sets
+                        a maximum speed for the main loop processing, if sync
+                        is enabled (this is to prevent the display falling
+                        behind the logic loop)
   -p POP_LIMIT, --population-limit POP_LIMIT
                         Limit of the population at any one time
-  -ttl MAX_TTL, --max-ttl MAX_TTL
-                        Maximum time to live possible for life forms
-  -ma MAX_AGGRO, --max-aggression MAX_AGGRO
-                        Maximum aggression factor possible for life forms
-  -mb MAX_BREED, --max-breed-threshold MAX_BREED
-                        Maximum breed threshold for entities
   -dc DNA_CHAOS, --dna-chaos DNA_CHAOS
                         Percentage chance of random DNA upon breeding of
                         entities
-  -se STATIC_ENTITY, --static-entity STATIC_ENTITY
-                        Percentage chance of an entity being static
-  -mt MAX_MOVES, --max-move-time MAX_MOVES
-                        Maximum possible time to move number for entities
-  -ct COMBINE_THRESHOLD, --combine-threshold COMBINE_THRESHOLD
-                        If a life form collides with another and both of their
-                        aggression levels are within this range and combining
-                        is enabled, they will combine (move together)
   -shs CUSTOM_SIZE_SIMULATOR, --simulator-hat-size CUSTOM_SIZE_SIMULATOR
                         Maximum possible time to move number for entities
   -c, --combine-mode    Enables life forms to combine into bigger ones
