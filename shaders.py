@@ -29,8 +29,6 @@ class ShaderStack:
             blank = not blank
             base_number = base_number + base_addition
 
-        print(self.shader_stack)
-
     def run_shader_stack(self, pixel_rgb):
         pixel_in = pixel_rgb
 
