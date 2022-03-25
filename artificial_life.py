@@ -34,13 +34,13 @@ class Session:
     current_life_form_amount: int = 0
     life_form_total_count: int = 0
 
-    def __post_init__(self):
-        if args.gravity:
-            self.directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                               'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
-        else:
-            self.directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                               'move_down_and_left', 'move_up_and_left', 'move_down_and_right')
+    directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
+                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
+
+    surrounding_point_choices = ('get_position_up', 'get_position_down', 'get_position_left',
+                                 'get_position_right', 'get_position_up_and_right',
+                                 'get_position_up_and_left', 'get_position_down_and_left',
+                                 'get_position_down_and_right')
 
 
 class LifeForm:
@@ -82,6 +82,7 @@ class LifeForm:
         self.red_color = random.randint(1, 255)
         self.breed_threshold = random.randint(0, args.max_num)
         self.combine_threshold = random.randint(0, args.max_num)
+        self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
 
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
@@ -97,17 +98,13 @@ class LifeForm:
         self.blue_color = random.randint(1, 255)
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
-        # todo: find a better way to deal with still entities when gravity is off, otherwise everything just comes to
-        #  a halt
-        if args.gravity:
-            self.static_entity_chance = random.randint(1, 100)
-            self.moving_life_form_percent = random.randint(1, 100)
-            if self.moving_life_form_percent <= self.static_entity_chance:
-                self.moving_life_form = False
-                self.direction = 'still'
-            else:
-                self.moving_life_form = True
-                self.direction = random.choice(current_session.directions)
+
+        # todo: this may be redundant and need revising
+        self.static_entity_chance = random.randint(1, 100)
+        self.moving_life_form_percent = random.randint(1, 100)
+        if self.moving_life_form_percent <= self.static_entity_chance:
+            self.moving_life_form = False
+            self.direction = 'still'
         else:
             self.moving_life_form = True
             self.direction = random.choice(current_session.directions)
@@ -305,6 +302,7 @@ class LifeForm:
         logger.debug(f'Seed 1: {self.life_seed1}')
         logger.debug(f'Seed 2: {self.life_seed2}')
         logger.debug(f'Seed 3: {self.life_seed3}')
+        logger.debug(f'Preferred Spawn Direction: {self.preferred_breed_direction}')
         logger.debug(f'Preferred Direction: {self.preferred_direction}')
         logger.debug(f'Direction: {self.direction}')
         logger.debug(f'Time to move total: {self.time_to_move}')
@@ -538,15 +536,20 @@ class LifeForm:
             free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
                                             self.positions_around_life_form) if x)
 
-            try:
-                random_free_coord = random.choice(free_coords)
-            except IndexError:
-                # if no free space is found return None
-                return None
+            preferred_spawn_point = getattr(self, self.preferred_breed_direction)()
 
-            logger.debug(f"Free space around the entity found: {random_free_coord}")
+            if preferred_spawn_point in free_coords:
+                chosen_free_coord = preferred_spawn_point
+            else:
+                try:
+                    chosen_free_coord = random.choice(free_coords)
+                except IndexError:
+                    # if no free space is found return None
+                    return None
+
+            logger.debug(f"Free space around the entity found: {chosen_free_coord}")
             # if no other entity is in this location return the co-ords
-            return random_free_coord[0], random_free_coord[1]
+            return chosen_free_coord[0], chosen_free_coord[1]
         else:
             # with no collision detection enabled just choose a random spot
             positions = random.choice(self.positions_around_life_form)
