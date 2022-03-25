@@ -424,6 +424,20 @@ class LifeForm:
             if moved:
                 self.surrounding_positions()
 
+            prior_direction = self.direction
+
+            # todo: this will need optimising and making more DRY
+            if args.gravity:
+                self.direction = 'move_down'
+
+                collision_check = self.collision_factory()
+                if not collision_check:
+                    if self.direction == 'move_down':
+                        moved = getattr(self, self.direction)()
+                        if moved:
+                            self.surrounding_positions()
+                self.direction = prior_direction
+
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
             if self.moving_life_form:
