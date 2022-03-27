@@ -35,7 +35,7 @@ class Session:
     life_form_total_count: int = 0
 
     directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
+                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right')
 
     surrounding_point_choices = ('get_position_up', 'get_position_down', 'get_position_left',
                                  'get_position_right', 'get_position_up_and_right',
@@ -83,6 +83,7 @@ class LifeForm:
         self.breed_threshold = random.randint(0, args.max_num)
         self.combine_threshold = random.randint(0, args.max_num)
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
+        self.strength = random.randint(0, args.max_num)
 
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
@@ -91,6 +92,7 @@ class LifeForm:
         self.aggression_factor = random.randint(0, args.max_num)
         self.time_to_move = random.randint(1, args.max_num)
         self.time_to_move_count = self.time_to_move
+        self.weight = random.randint(0, args.max_num)
 
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
@@ -99,16 +101,18 @@ class LifeForm:
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
 
-        # todo: this may be redundant and need revising
-        self.static_entity_chance = random.randint(1, 100)
-        self.moving_life_form_percent = random.randint(1, 100)
-        if self.moving_life_form_percent <= self.static_entity_chance:
-            self.moving_life_form = False
-            self.direction = 'still'
-        else:
-            self.moving_life_form = True
-            self.direction = random.choice(current_session.directions)
+        # # todo: this may be redundant and need revising
+        # self.static_entity_chance = random.randint(1, 100)
+        # self.moving_life_form_percent = random.randint(1, 100)
+        # if self.moving_life_form_percent <= self.static_entity_chance:
+        #     self.moving_life_form = False
+        #     self.direction = 'still'
+        # else:
+        #     self.moving_life_form = True
+        #     self.direction = random.choice(current_session.directions)
 
+        self.moving_life_form = True
+        self.direction = random.choice(current_session.directions)
         self.preferred_direction = self.direction
 
         # reset the global random seed
@@ -131,7 +135,7 @@ class LifeForm:
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
         # collided with
-        collision_detected, collided_life_form_id = self.collision_detector()
+        collision_detected, collided_life_form_id, gravity_move_clear = self.collision_detector()
         # get the count of total life forms currently active
 
         # if there has been a collision with another entity it will attempt to interact with the other entity
@@ -147,7 +151,7 @@ class LifeForm:
             # call to randomise direction function for the entity
             direction_attempt = self.randomise_direction()
 
-            collision_detected_again, collided_life_form_id_again = self.collision_detector()
+            collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
 
             # find a new direction until a free space is found, if nowhere around the life form is clear
             # it will go to a still state until it attempts to change direction again
@@ -161,11 +165,10 @@ class LifeForm:
 
                 direction_attempt = self.randomise_direction(
                     exclusion_list=attempted_directions)
-
                 if not direction_attempt:
                     self.direction = 'still'
                     break
-                collision_detected_again, collided_life_form_id_again = self.collision_detector()
+                collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
 
             if collided_life_form_id:
                 if collided_life_form_id is None:
@@ -187,7 +190,7 @@ class LifeForm:
                             except TypeError:
                                 logger.debug("No space available for a spawn of a new life form")
 
-                                return True
+                                return True, gravity_move_clear
 
                             # increase the life form total by 1
                             current_session.life_form_total_count += 1
@@ -239,16 +242,16 @@ class LifeForm:
                     else:
                         # if the life form has bumped into another life form that is above the breed
                         # threshold, the two life forms will engage in combat
-                        return self.combat(other_life_form_id=collided_life_form_id)
+                        return self.combat(other_life_form_id=collided_life_form_id), gravity_move_clear
 
                 # if the entities' aggression factor is above its breed threshold it will attempt to kill the entity
                 # it has collided with instead of breed
                 elif self.aggression_factor > self.breed_threshold:
-                    return self.combat(other_life_form_id=collided_life_form_id)
+                    return self.combat(other_life_form_id=collided_life_form_id), gravity_move_clear
 
-            return True
+            return True, gravity_move_clear
         else:
-            return False
+            return False, gravity_move_clear
 
     def combat(self, other_life_form_id):
         # if the other entities' aggression factor is lower it will be killed and removed from the
@@ -258,6 +261,8 @@ class LifeForm:
             logger.debug('Other entity killed')
 
             self.time_to_live_count += LifeForm.lifeforms[other_life_form_id].time_to_live_count
+            self.weight += LifeForm.lifeforms[other_life_form_id].weight
+            self.strength += LifeForm.lifeforms[other_life_form_id].strength
 
             LifeForm.lifeforms[other_life_form_id].entity_remove()
 
@@ -271,6 +276,8 @@ class LifeForm:
             logger.debug('Current entity killed')
 
             LifeForm.lifeforms[other_life_form_id].time_to_live_count += self.time_to_live_count
+            LifeForm.lifeforms[other_life_form_id].weight += self.weight
+            LifeForm.lifeforms[other_life_form_id].strength += self.strength
 
             return "Died"
 
@@ -280,6 +287,8 @@ class LifeForm:
             if fifty_fifty():
                 logger.debug('Current entity killed')
                 LifeForm.lifeforms[other_life_form_id].time_to_live_count += self.time_to_live_count
+                LifeForm.lifeforms[other_life_form_id].weight += self.weight
+                LifeForm.lifeforms[other_life_form_id].strength += self.strength
 
                 return "Died"
 
@@ -400,9 +409,7 @@ class LifeForm:
         return True
 
     def still(self):
-        if args.gravity:
-            self.direction = 'move_down'
-            return True
+        return False
 
     def movement(self):
         """
@@ -415,28 +422,21 @@ class LifeForm:
         if not self.alive:
             return "Dead"
 
-        collision_check = self.collision_factory()
+        if self.strength < self.weight:
+            self.direction = 'still'
+
+        collision_check, gravity_check = self.collision_factory()
 
         if collision_check == "Died":
             return collision_check
         elif not collision_check:
             moved = getattr(self, self.direction)()
+
+            if args.gravity:
+                if gravity_check:
+                    moved = self.move_down()
             if moved:
                 self.surrounding_positions()
-
-            prior_direction = self.direction
-
-            # todo: this will need optimising and making more DRY
-            if args.gravity:
-                self.direction = 'move_down'
-
-                collision_check = self.collision_factory()
-                if not collision_check:
-                    if self.direction == 'move_down':
-                        moved = getattr(self, self.direction)()
-                        if moved:
-                            self.surrounding_positions()
-                self.direction = prior_direction
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
@@ -574,111 +574,163 @@ class LifeForm:
         """
         Determine whether a life form is colliding with another currently on the board.
         """
+
+        gravity_move_clear = False
+
         # check to see if the life form has reached the edge of the board vs its direction
+
+        # using the direction of the current life form determine on next move if the life form were to collide with
+        # another, if so return the id of the other life form
         if self.direction == 'move_right':
             try:
                 if self.get_position_right()[0]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_right()[0],
+                                                            self.get_position_right()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_left':
             try:
                 if self.get_position_left()[0]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_left()[0],
+                                                            self.get_position_left()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_down':
             try:
                 if self.get_position_down()[1]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_down()[0],
+                                                            self.get_position_down()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_up':
             try:
                 if self.get_position_up()[1]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            # no need to check if a post move + post gravity move will be clear, as it is this entities current position
+            gravity_move_clear = True
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_down_and_right':
             try:
                 if self.get_position_down_and_right()[0] or self.get_position_down_and_right()[1]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_down_and_right()[0],
+                                                            self.get_position_down_and_right()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_up_and_left':
             try:
                 if self.get_position_up_and_left()[0] or self.get_position_up_and_left()[1]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_up_and_left()[0],
+                                                            self.get_position_up_and_left()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_down_and_left':
             try:
                 if self.get_position_down_and_left()[0] or self.get_position_down_and_left()[1]:
                     pass
             except TypeError:
-                return True, None
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_down_and_left()[0],
+                                                            self.get_position_down_and_left()[1] + 1)):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
         elif self.direction == 'move_up_and_right':
             try:
                 if self.get_position_up_and_right()[0] or self.get_position_up_and_right()[1]:
                     pass
             except TypeError:
-                return True, None
-        # if direction is 'still' then the life form is not moving and therefore is not going to collide with
-        # anything
-        elif self.direction == 'still':
-            return False, None
+                return True, None, gravity_move_clear
 
-        # using the direction of the current life form determine on next move if the life form were to collide with
-        # another, if so return the id of the other life form
-        if self.direction == 'move_right':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position((self.get_position_up_and_right()[0],
+                                                            self.get_position_up_and_right()[1] + 1)):
+                    gravity_move_clear = True
 
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_left':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_down':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_up':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_down_and_right':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_up_and_left':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_down_and_left':
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
-        elif self.direction == 'move_up_and_right':
             s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_right())
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id
+                return True, s_item_life_form_id, gravity_move_clear
 
-        return False, None
+        elif self.direction == 'still':
+            try:
+                if self.get_position_down():
+                    pass
+            except TypeError:
+                return True, None, gravity_move_clear
+
+            if args.gravity:
+                if pre_buffer_access.check_buffer_position(self.get_position_down()):
+                    gravity_move_clear = True
+
+            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
+
+            if s_item_life_form_id:
+                return True, s_item_life_form_id, gravity_move_clear
+
+        return False, None, gravity_move_clear
 
     def combine_entities(self, life_form_2):
         """
@@ -789,9 +841,6 @@ def main():
                 # for each life_form_id in the list use the life_form_id of the life form to work from
                 for life_form in LifeForm.lifeforms.copy().values():
 
-                    # clear previous position in the buffer
-                    pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
-
                     # call expiry function for current life form and update the list of life forms
                     # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
                     try:
@@ -835,6 +884,9 @@ def main():
                     if life_form.matrix_position_y < 0 or \
                             life_form.matrix_position_y > HATControl.u_height_max:
                         raise Exception("Life form has exceeded y axis")
+
+                    # clear previous position in the buffer
+                    pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
 
                     # write new position in the buffer
                     pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
