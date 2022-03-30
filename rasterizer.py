@@ -13,10 +13,9 @@ class PreBuffer:
 
         self.buffer_ready = False
 
-    def generate_buffer(self, width, height):
-        for x_position in range(width):
-            for y_position in range(height):
-                self.pre_buffer[(x_position, y_position)] = self.blank_pixel
+    def generate_buffer(self, coord_map):
+        for pos in coord_map:
+            self.pre_buffer[pos] = self.blank_pixel
 
         self.buffer_ready = True
 
@@ -42,33 +41,31 @@ class PreBuffer:
 
 
 class FrameBuffer:
-    def __init__(self, width, height):
+    def __init__(self, session_info):
         self.front_buffer = {}
         self.back_buffer = {}
 
-        self.buffer_width = width
-        self.buffer_height = height
+        self.session_info = session_info
 
         self.current_buffer_front = True
         self.blank_pixel = (0, 0, 0)
 
-        self.shader_stack = ShaderStack(self.buffer_width, self.buffer_height)
+        self.shader_stack = ShaderStack(self.session_info)
 
         self.generate_buffers()
 
         # WARNING: be careful with these, it can cause flashing images
-        # self.shader_stack.multi_shader_creator(input_shader=ConfigurableShader, number_of_shaders=2, base_number=4,
-        #                                        base_addition=16, base_rgb=(128, 0, 0))
-        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=32, shader_colour=(0, 128, 0)))
-        # self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=31, shader_colour=(0, 0, 64)))
+        self.shader_stack.multi_shader_creator(input_shader=ConfigurableShader, number_of_shaders=2, base_number=4,
+                                               base_addition=16, base_rgb=(64, 0, 0))
+        self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=32, shader_colour=(0, 64, 0)))
+        self.shader_stack.add_to_shader_stack(ConfigurableShader(count_number_max=31, shader_colour=(0, 0, 64)))
 
         self.motion_blur = ConfigurableShader()
 
     def generate_buffers(self):
-        for x_position in range(self.buffer_width):
-            for y_position in range(self.buffer_height):
-                self.front_buffer[(x_position, y_position)] = self.blank_pixel
-                self.back_buffer[(x_position, y_position)] = self.blank_pixel
+        for pos in self.session_info.coord_map:
+            self.front_buffer[pos] = self.blank_pixel
+            self.back_buffer[pos] = self.blank_pixel
 
     def write_to_buffer(self, pixel_coord, pixel_rgb):
         if self.current_buffer_front:
@@ -95,30 +92,31 @@ class ScreenDrawer:
         self.frame_refresh_delay_ms = 1 / buffer_refresh
         logger.debug(f'Milliseconds per-frame to aim for: {self.frame_refresh_delay_ms}')
 
-        self.frame_buffer_access = FrameBuffer(self.hat_control.u_width, self.hat_control.u_height)
+        self.frame_buffer_access = FrameBuffer(self.session_info)
 
-        pre_buffer_access.generate_buffer(self.hat_control.u_width, self.hat_control.u_height)
+        pre_buffer_access.generate_buffer(self.session_info.coord_map)
 
         self.draw()
 
     def life_form_pass(self):
-        for coord, pixel in pre_buffer_access.pre_buffer.items():
-            if not pixel[0] == (0, 0, 0):
-                self.frame_buffer_access.write_to_buffer(coord, pixel[0])
+        [self.frame_buffer_access.write_to_buffer(coord, pixel[0]) for coord, pixel in
+         pre_buffer_access.pre_buffer.items() if not pixel[0] == (0, 0, 0)]
 
     def shader_pass(self):
-        for coord, pixel in self.frame_buffer_access.front_buffer.items():
-            shaded_pixel = self.frame_buffer_access.shader_stack.run_shader_stack(pixel)
-            self.frame_buffer_access.write_to_buffer(coord, shaded_pixel)
+        [self.frame_buffer_access.write_to_buffer(coord, self.frame_buffer_access.shader_stack.run_shader_stack(pixel))
+         for coord, pixel in
+         self.frame_buffer_access.front_buffer.items()]
 
-    def draw_to_output(self):
-        for coord, pixel in self.frame_buffer_access.front_buffer.items():
-            self.hat_control.draw_pixels(coord, pixel)
-
-            self.frame_buffer_access.write_to_buffer(coord, (
-                self.frame_buffer_access.motion_blur.custom_rgb_shader(pixel, (0, 0, 0), 128)))
+    def buffer_scan(self):
+        [self.draw_to_output(coord, pixel) for coord, pixel in self.frame_buffer_access.front_buffer.items()]
 
         self.hat_control.unicorn.show()
+
+    def draw_to_output(self, coord, pixel):
+        self.hat_control.draw_pixels(coord, pixel)
+
+        self.frame_buffer_access.write_to_buffer(coord, (
+            self.frame_buffer_access.motion_blur.custom_rgb_shader(pixel, (0, 0, 0), 128)))
 
     def draw(self):
         next_frame = time() + self.frame_refresh_delay_ms
@@ -128,7 +126,7 @@ class ScreenDrawer:
 
                 self.life_form_pass()
 
-                self.draw_to_output()
+                self.buffer_scan()
 
                 if time() > next_frame:
                     # todo: do something clever with buffer flipping here?
@@ -143,7 +141,7 @@ class ScreenDrawer:
                 f'concurrent Lifeforms was: {self.session_info.highest_concurrent_lifeforms}\n Last count of active '
                 f'Lifeforms: {self.session_info.current_life_form_amount}')
             self.frame_buffer_access.generate_buffers()
-            self.draw_to_output()
+            self.buffer_scan()
 
 
 pre_buffer_access = PreBuffer()

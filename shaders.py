@@ -1,8 +1,11 @@
 class ShaderStack:
-    def __init__(self, width, height):
+    def __init__(self, session_info):
         self.shader_id = 0
         self.shader_stack = {}
-        self.max_pixel_combine = width * height
+
+        self.session_info = session_info
+
+        self.max_pixel_combine = len(session_info.coord_map)
 
     def add_to_shader_stack(self, configured_shader):
         self.shader_stack[self.shader_id] = configured_shader

@@ -29,6 +29,7 @@ class Session:
     highest_concurrent_lifeforms: int
     draw_trails: bool
     retries: bool
+    coord_map: tuple = ()
     last_removal: int = -1
     current_layer: int = 0
     current_life_form_amount: int = 0
@@ -41,6 +42,9 @@ class Session:
                                  'get_position_right', 'get_position_up_and_right',
                                  'get_position_up_and_left', 'get_position_down_and_left',
                                  'get_position_down_and_right')
+
+    def __post_init__(self):
+        self.coord_map = tuple((x, y) for x in range(HATControl.u_width) for y in range(HATControl.u_height))
 
 
 class LifeForm:
@@ -101,19 +105,11 @@ class LifeForm:
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
 
-        # # todo: this may be redundant and need revising
-        # self.static_entity_chance = random.randint(1, 100)
-        # self.moving_life_form_percent = random.randint(1, 100)
-        # if self.moving_life_form_percent <= self.static_entity_chance:
-        #     self.moving_life_form = False
-        #     self.direction = 'still'
-        # else:
-        #     self.moving_life_form = True
-        #     self.direction = random.choice(current_session.directions)
-
-        self.moving_life_form = True
         self.direction = random.choice(current_session.directions)
         self.preferred_direction = self.direction
+
+        self.out_of_moves = False
+        self.attempted_directions = set()
 
         # reset the global random seed
         random.seed()
@@ -146,10 +142,14 @@ class LifeForm:
             # in that direction rather than bounce
             self.previous_direction = self.direction
 
-            attempted_directions = [self.direction]
+            self.attempted_directions = set()
+
+            self.out_of_moves = False
+
+            self.attempted_directions.add(self.direction)
 
             # call to randomise direction function for the entity
-            direction_attempt = self.randomise_direction()
+            self.randomise_direction()
 
             collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
 
@@ -158,16 +158,16 @@ class LifeForm:
             while collision_detected_again:
                 logger.debug(
                     f'Collision detected again: {self.life_form_id} collided with {collided_life_form_id_again}, '
-                    f'with previously tried directions: {attempted_directions}')
+                    f'with previously tried directions: {self.attempted_directions}')
 
                 # storing previously attempted directions so that the same direction is not tried again
-                attempted_directions.append(direction_attempt)
+                self.attempted_directions.add(self.direction)
 
-                direction_attempt = self.randomise_direction(
-                    exclusion_list=attempted_directions)
-                if not direction_attempt:
-                    self.direction = 'still'
+                self.randomise_direction()
+
+                if self.out_of_moves:
                     break
+
                 collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
 
             if collided_life_form_id:
@@ -424,6 +424,8 @@ class LifeForm:
 
         if self.strength < self.weight:
             self.direction = 'still'
+        elif self.strength > self.weight and self.direction == 'still':
+            self.randomise_direction()
 
         collision_check, gravity_check = self.collision_factory()
 
@@ -440,48 +442,45 @@ class LifeForm:
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
-            if self.moving_life_form:
-                if not self.linked_up:
-                    if self.time_to_move_count > 0:
-                        self.time_to_move_count -= 1
-                    elif self.time_to_move_count <= 0:
-                        self.time_to_move_count = self.time_to_move
-                        self.direction = self.randomise_direction()
-                else:
-                    # if combining is enabled set to the direction of the linked entity, however the other entity may
-                    # have expired and weird things happen, and it may not be accessible from within the class holder
-                    # so just randomise direction and de-link
-                    try:
-                        self.direction = LifeForm.lifeforms[self.linked_to].direction
-                    except KeyError:
-                        self.linked_up = False
-                        self.direction = self.randomise_direction()
+            if not self.linked_up:
+                if self.time_to_move_count > 0:
+                    self.time_to_move_count -= 1
+                elif self.time_to_move_count <= 0:
+                    self.time_to_move_count = self.time_to_move
+                    self.randomise_direction()
+            else:
+                # if combining is enabled set to the direction of the linked entity, however the other entity may
+                # have expired and weird things happen, and it may not be accessible from within the class holder
+                # so just randomise direction and de-link
+                try:
+                    self.direction = LifeForm.lifeforms[self.linked_to].direction
+                except KeyError:
+                    self.linked_up = False
+                    self.randomise_direction()
 
-    def randomise_direction(self, exclusion_list=None):
+    def randomise_direction(self):
         """
         Select a random new direction for the life form that is not the direction it is
         already going. It also allows for a list of previously attempted directions to be passed in and excluded.
         """
-        if exclusion_list is None:
-            exclusion_list = []
-        if self.direction not in exclusion_list:
-            exclusion_list.append(self.direction)
-        if self.preferred_direction not in exclusion_list:
+        if self.direction not in self.attempted_directions:
+            self.attempted_directions.add(self.direction)
+        if self.preferred_direction not in self.attempted_directions:
             r = self.preferred_direction
         else:
             try:
-                if self.moving_life_form:
-                    r = random.choice([d for d in current_session.directions if d not in exclusion_list])
-                    if r in exclusion_list:
-                        raise Exception(f"Direction: {r} found in exclusion list: {exclusion_list}")
-                else:
-                    r = 'still'
+                r = random.choice([d for d in current_session.directions if d not in self.attempted_directions])
+                if r in self.attempted_directions:
+                    raise Exception(f"Direction: {r} found in exclusion list: {self.attempted_directions}")
+
                 self.direction = r
             except IndexError:
-                r = False
+                r = 'still'
+                self.out_of_moves = True
 
-        logger.debug(f"New direction: {r} with exclusion list: {exclusion_list}")
-        return r
+        logger.debug(f"New direction: {r} with exclusion list: {self.attempted_directions}")
+
+        self.direction = r
 
     def linked(self, life_form_id):
         """
@@ -546,9 +545,12 @@ class LifeForm:
         """
         # check area around entity for other life forms
         if args.spawn_collision_detection:
+            free_coords = []
 
-            free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
-                                            self.positions_around_life_form) if x)
+            for coord in current_session.coord_map:
+                data = pre_buffer_access.check_buffer_position(coord)
+                if data:
+                    free_coords.append(data)
 
             preferred_spawn_point = getattr(self, self.preferred_breed_direction)()
 
@@ -716,7 +718,7 @@ class LifeForm:
 
         elif self.direction == 'still':
             try:
-                if self.get_position_down():
+                if self.get_position_down()[1]:
                     pass
             except TypeError:
                 return True, None, gravity_move_clear
@@ -749,12 +751,20 @@ class LifeForm:
 
 def global_board_generator():
     # with collision detection determine if a spot on the board contains a life form
+
     if args.spawn_collision_detection:
-        free_coords = tuple(x for x in (pre_buffer_access.check_buffer_position(coord) for coord in
-                                        pre_buffer_access.pre_buffer) if x)
+        free_coords = []
+        for x in range(HATControl.u_width):
+            for y in range(HATControl.u_height):
+                data = pre_buffer_access.check_buffer_position((x, y))
+                if data:
+                    free_coords.append(data)
+
         try:
             random_free_coord = random.choice(free_coords)
+
         except IndexError:
+
             # if no free space is found return None
             return None
 
