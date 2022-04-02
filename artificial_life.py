@@ -36,7 +36,7 @@ class Session:
     life_form_total_count: int = 0
 
     directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right')
+                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
 
     surrounding_point_choices = ('get_position_up', 'get_position_down', 'get_position_left',
                                  'get_position_right', 'get_position_up_and_right',
@@ -45,6 +45,8 @@ class Session:
 
     def __post_init__(self):
         self.coord_map = tuple((x, y) for x in range(HATControl.u_width) for y in range(HATControl.u_height))
+
+        self.free_board_positions = list(self.coord_map)
 
 
 class LifeForm:
@@ -131,9 +133,8 @@ class LifeForm:
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
         # collided with
-        collision_detected, collided_life_form_id, gravity_move_clear = self.collision_detector()
+        collision_detected, collided_life_form_id = self.collision_detector()
         # get the count of total life forms currently active
-
         # if there has been a collision with another entity it will attempt to interact with the other entity
         if collision_detected:
             logger.debug(f'Collision detected: {self.life_form_id} collided with {collided_life_form_id}')
@@ -151,7 +152,7 @@ class LifeForm:
             # call to randomise direction function for the entity
             self.randomise_direction()
 
-            collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
+            collision_detected_again, collided_life_form_id_again = self.collision_detector()
 
             # find a new direction until a free space is found, if nowhere around the life form is clear
             # it will go to a still state until it attempts to change direction again
@@ -168,7 +169,7 @@ class LifeForm:
                 if self.out_of_moves:
                     break
 
-                collision_detected_again, collided_life_form_id_again, gravity_move_clear = self.collision_detector()
+                collision_detected_again, collided_life_form_id_again = self.collision_detector()
 
             if collided_life_form_id:
                 if collided_life_form_id is None:
@@ -190,7 +191,7 @@ class LifeForm:
                             except TypeError:
                                 logger.debug("No space available for a spawn of a new life form")
 
-                                return True, gravity_move_clear
+                                return True
 
                             # increase the life form total by 1
                             current_session.life_form_total_count += 1
@@ -242,16 +243,16 @@ class LifeForm:
                     else:
                         # if the life form has bumped into another life form that is above the breed
                         # threshold, the two life forms will engage in combat
-                        return self.combat(other_life_form_id=collided_life_form_id), gravity_move_clear
+                        return self.combat(other_life_form_id=collided_life_form_id)
 
                 # if the entities' aggression factor is above its breed threshold it will attempt to kill the entity
                 # it has collided with instead of breed
                 elif self.aggression_factor > self.breed_threshold:
-                    return self.combat(other_life_form_id=collided_life_form_id), gravity_move_clear
+                    return self.combat(other_life_form_id=collided_life_form_id)
 
-            return True, gravity_move_clear
+            return True
         else:
-            return False, gravity_move_clear
+            return False
 
     def combat(self, other_life_form_id):
         # if the other entities' aggression factor is lower it will be killed and removed from the
@@ -325,50 +326,50 @@ class LifeForm:
         logger.debug(f'Color: R-{self.red_color} G-{self.green_color} B-{self.blue_color} \n')
 
     def get_position_up(self):
-        position = self.matrix_position_x, self.matrix_position_y - 1
-        if position[1] < 0:
+        position = (self.matrix_position_x, self.matrix_position_y - 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_down(self):
-        position = self.matrix_position_x, self.matrix_position_y + 1
-        if position[1] > HATControl.u_height_max:
+        position = (self.matrix_position_x, self.matrix_position_y + 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_left(self):
-        position = self.matrix_position_x - 1, self.matrix_position_y
-        if position[0] < 0:
+        position = (self.matrix_position_x - 1, self.matrix_position_y)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_right(self):
-        position = self.matrix_position_x + 1, self.matrix_position_y
-        if position[0] > HATControl.u_width_max:
+        position = (self.matrix_position_x + 1, self.matrix_position_y)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_up_and_right(self):
-        position = self.matrix_position_x + 1, self.matrix_position_y - 1
-        if position[0] > HATControl.u_width_max or position[1] < 0:
+        position = (self.matrix_position_x + 1, self.matrix_position_y - 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_up_and_left(self):
-        position = self.matrix_position_x - 1, self.matrix_position_y - 1
-        if position[0] < 0 or position[1] < 0:
+        position = (self.matrix_position_x - 1, self.matrix_position_y - 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_down_and_right(self):
-        position = self.matrix_position_x + 1, self.matrix_position_y + 1
-        if position[0] > HATControl.u_width_max or position[1] > HATControl.u_height_max:
+        position = (self.matrix_position_x + 1, self.matrix_position_y + 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
     def get_position_down_and_left(self):
-        position = self.matrix_position_x - 1, self.matrix_position_y + 1
-        if position[0] < 0 or position[1] > HATControl.u_height_max:
+        position = (self.matrix_position_x - 1, self.matrix_position_y + 1)
+        if position not in current_session.coord_map:
             return None
         return position
 
@@ -409,7 +410,7 @@ class LifeForm:
         return True
 
     def still(self):
-        return False
+        return True
 
     def movement(self):
         """
@@ -418,27 +419,62 @@ class LifeForm:
         move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
         the edge of the board or another entity.
         """
+
         # if entity is dead then skip and return
         if not self.alive:
             return "Dead"
-
+        # todo: make the gravity system a lot better and work off of calculations of weight strength etc.
         if self.strength < self.weight:
             self.direction = 'still'
         elif self.strength > self.weight and self.direction == 'still':
             self.randomise_direction()
 
-        collision_check, gravity_check = self.collision_factory()
+        collision_check = self.collision_factory()
+
+        # self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
 
         if collision_check == "Died":
             return collision_check
         elif not collision_check:
+            # todo: tidy up the movement system for less repeated code, so the collision checks are done within the movement functions
+            pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
             moved = getattr(self, self.direction)()
-
-            if args.gravity:
-                if gravity_check:
-                    moved = self.move_down()
             if moved:
                 self.surrounding_positions()
+
+                # write new position in the buffer
+                pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
+                                                  (self.red_color, self.green_color,
+                                                   self.blue_color), self.life_form_id)
+
+                if args.gravity and (self.strength < self.weight or self.direction == 'still'):
+
+                    self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
+                    pre_grav_direction = self.direction
+                    self.direction = 'move_down'
+
+                    # if entity is dead then skip and return
+                    if not self.alive:
+                        return "Dead"
+
+                    collision_check = self.collision_factory()
+
+                    if collision_check == "Died":
+                        return collision_check
+                    elif not collision_check:
+                        pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+                        moved = getattr(self, self.direction)()
+                        if moved:
+                            self.surrounding_positions()
+                            # pre_buffer_access.del_buffer_pixel(self.prev_matrix_position)
+                            # write new position in the buffer
+                            pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
+                                                              (self.red_color, self.green_color,
+                                                               self.blue_color), self.life_form_id)
+
+                    self.direction = pre_grav_direction
+
+                    logger.debug(f"Moved from gravity")
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
@@ -507,10 +543,11 @@ class LifeForm:
         entity from the board entirely and blank it on top of the alive check that will skip it, to double ensure a
         dead entity is no longer interacted with during a loop that it died in.
         """
-        pre_buffer_access.clear_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+        pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
         self.alive = False
         current_session.last_removal = self.life_form_id
         del LifeForm.lifeforms[self.life_form_id]
+        logger.debug(f"Entity {self.life_form_id} removed")
 
     def fade_entity(self):
         """
@@ -545,23 +582,22 @@ class LifeForm:
         """
         # check area around entity for other life forms
         if args.spawn_collision_detection:
-            free_coords = []
-
-            for coord in current_session.coord_map:
-                data = pre_buffer_access.check_buffer_position(coord)
-                if data:
-                    free_coords.append(data)
-
             preferred_spawn_point = getattr(self, self.preferred_breed_direction)()
 
-            if preferred_spawn_point in free_coords:
+            data = pre_buffer_access.get_from_buffer(preferred_spawn_point)
+
+            if not data:
                 chosen_free_coord = preferred_spawn_point
             else:
-                try:
-                    chosen_free_coord = random.choice(free_coords)
-                except IndexError:
-                    # if no free space is found return None
-                    return None
+                collision_map = list(self.positions_around_life_form)
+                random.shuffle(collision_map)
+                while data:
+                    try:
+                        chosen_free_coord = collision_map.pop()
+                        data = pre_buffer_access.get_from_buffer(chosen_free_coord)
+                    except IndexError:
+                        # if no free space is found return None
+                        return None
 
             logger.debug(f"Free space around the entity found: {chosen_free_coord}")
             # if no other entity is in this location return the co-ords
@@ -577,162 +613,106 @@ class LifeForm:
         Determine whether a life form is colliding with another currently on the board.
         """
 
-        gravity_move_clear = False
-
         # check to see if the life form has reached the edge of the board vs its direction
 
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
         if self.direction == 'move_right':
+            if self.get_position_right() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_right()[0]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_right()[0],
-                                                            self.get_position_right()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_left':
+            if self.get_position_left() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_left()[0]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_left()[0],
-                                                            self.get_position_left()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_down':
+            if self.get_position_down() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_down()[1]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_down()[0],
-                                                            self.get_position_down()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_up':
-            try:
-                if self.get_position_up()[1]:
-                    pass
-            except TypeError:
-                return True, None, gravity_move_clear
+            if self.get_position_up() not in current_session.coord_map:
+                return True, None
 
-            # no need to check if a post move + post gravity move will be clear, as it is this entities current position
-            gravity_move_clear = True
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())
+            try:
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())[1]
+            except TypeError:
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_down_and_right':
+            if self.get_position_down_and_right() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_down_and_right()[0] or self.get_position_down_and_right()[1]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_down_and_right()[0],
-                                                            self.get_position_down_and_right()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_up_and_left':
+            if self.get_position_up_and_left() not in current_session.coord_map:
+                return True, None
             try:
-                if self.get_position_up_and_left()[0] or self.get_position_up_and_left()[1]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_up_and_left()[0],
-                                                            self.get_position_up_and_left()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_down_and_left':
+            if self.get_position_down_and_left() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_down_and_left()[0] or self.get_position_down_and_left()[1]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_down_and_left()[0],
-                                                            self.get_position_down_and_left()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
         elif self.direction == 'move_up_and_right':
+            if self.get_position_up_and_right() not in current_session.coord_map:
+                return True, None
+
             try:
-                if self.get_position_up_and_right()[0] or self.get_position_up_and_right()[1]:
-                    pass
+                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_right())[1]
             except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position((self.get_position_up_and_right()[0],
-                                                            self.get_position_up_and_right()[1] + 1)):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_right())
+                return False, None
 
             if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
+                return True, s_item_life_form_id
 
-        elif self.direction == 'still':
-            try:
-                if self.get_position_down()[1]:
-                    pass
-            except TypeError:
-                return True, None, gravity_move_clear
-
-            if args.gravity:
-                if pre_buffer_access.check_buffer_position(self.get_position_down()):
-                    gravity_move_clear = True
-
-            s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id, gravity_move_clear
-
-        return False, None, gravity_move_clear
+        return False, None
 
     def combine_entities(self, life_form_2):
         """
@@ -753,15 +733,8 @@ def global_board_generator():
     # with collision detection determine if a spot on the board contains a life form
 
     if args.spawn_collision_detection:
-        free_coords = []
-        for x in range(HATControl.u_width):
-            for y in range(HATControl.u_height):
-                data = pre_buffer_access.check_buffer_position((x, y))
-                if data:
-                    free_coords.append(data)
-
         try:
-            random_free_coord = random.choice(free_coords)
+            random_free_coord = current_session.free_board_positions.pop()
 
         except IndexError:
 
@@ -885,7 +858,8 @@ def main():
                     # iterate over that final entity one last time
                     if life_form.life_form_id == current_session.last_removal:
                         if len(LifeForm.lifeforms.values()) > 1:
-                            raise Exception(f"Entity that expired this loop has been processed again")
+                            raise Exception(
+                                f"Entity {life_form.life_form_id} that expired this loop has been processed again")
 
                     # some debug-like code to identify when a life form goes outside the LED board
                     if life_form.matrix_position_x < 0 or \
@@ -895,21 +869,12 @@ def main():
                             life_form.matrix_position_y > HATControl.u_height_max:
                         raise Exception("Life form has exceeded y axis")
 
-                    # clear previous position in the buffer
-                    pre_buffer_access.clear_buffer_pixel(life_form.prev_matrix_position)
-
-                    # write new position in the buffer
-                    pre_buffer_access.write_to_buffer((life_form.matrix_position_x, life_form.matrix_position_y),
-                                                      (life_form.red_color, life_form.green_color,
-                                                       life_form.blue_color), life_form.life_form_id)
-
-                    life_form.prev_matrix_position = (life_form.matrix_position_x, life_form.matrix_position_y)
-
             # if the main list of entities is empty then all have expired; the program displays final information
             # about the programs run and exits; unless retry mode is active, then a new set of entities are created
             # and the simulation starts fresh with the same initial configuration
             elif not LifeForm.lifeforms.values():
                 if first_run:
+                    random.shuffle(current_session.free_board_positions)
                     [class_generator(i) for i in range(args.life_form_total)]
 
                     first_run = False
@@ -920,6 +885,8 @@ def main():
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.current_layer = 0
                     current_session.last_removal = -1
+                    current_session.free_board_positions = list(current_session.coord_map)
+                    random.shuffle(current_session.free_board_positions)
 
                     [class_generator(i) for i in range(args.life_form_total)]
 
