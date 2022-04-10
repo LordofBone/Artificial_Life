@@ -85,7 +85,7 @@ class LifeForm:
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
-        self.red_color = random.randint(1, 255)
+        self.red_color = random.uniform(0, 10)
         self.breed_threshold = random.randint(0, args.max_num)
         self.combine_threshold = random.randint(0, args.max_num)
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
@@ -94,7 +94,7 @@ class LifeForm:
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
-        self.green_color = random.randint(1, 255)
+        self.green_color = random.uniform(0, 10)
         self.aggression_factor = random.randint(0, args.max_num)
         self.time_to_move = random.randint(1, args.max_num)
         self.time_to_move_count = self.time_to_move
@@ -103,7 +103,7 @@ class LifeForm:
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
         random.seed(self.life_seed3)
-        self.blue_color = random.randint(1, 255)
+        self.blue_color = random.uniform(0, 10)
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
 
@@ -323,7 +323,7 @@ class LifeForm:
         logger.debug(f'Position X: {self.matrix_position_x}')
         logger.debug(f'Position Y: {self.matrix_position_y}')
         logger.debug(f'Surrounding positions: {self.positions_around_life_form}')
-        logger.debug(f'Color: R-{self.red_color} G-{self.green_color} B-{self.blue_color} \n')
+        logger.debug(f'Color: R: {self.red_color} G: {self.green_color} B: {self.blue_color} \n')
 
     def get_position_up(self):
         position = (self.matrix_position_x, self.matrix_position_y - 1)
@@ -436,7 +436,8 @@ class LifeForm:
         if collision_check == "Died":
             return collision_check
         elif not collision_check:
-            # todo: tidy up the movement system for less repeated code, so the collision checks are done within the movement functions
+            # todo: tidy up the movement system for less repeated code, so the collision checks are done within the
+            #  movement functions
             pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
             moved = getattr(self, self.direction)()
             if moved:
@@ -823,7 +824,6 @@ def main():
                 current_session.current_layer += 1
                 # for each life_form_id in the list use the life_form_id of the life form to work from
                 for life_form in LifeForm.lifeforms.copy().values():
-
                     # call expiry function for current life form and update the list of life forms
                     # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
                     try:
