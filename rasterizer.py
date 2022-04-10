@@ -49,12 +49,12 @@ class FrameBuffer:
         self.shader_stack = ShaderStack(self.session_info)
 
         # WARNING: be careful with these, it can cause flashing images
-        self.shader_stack.multi_shader_creator(input_shader=FullScreenPatternShader, number_of_shaders=2, base_number=4,
-                                               base_addition=16, base_rgb=(1.25, 0.0, 0.0))
-        self.shader_stack.add_to_shader_stack(
-            FullScreenPatternShader(count_number_max=32, shader_colour=(0.0, 1.25, 0.0)))
-        self.shader_stack.add_to_shader_stack(
-            FullScreenPatternShader(count_number_max=31, shader_colour=(0.0, 0.0, 1.25)))
+        # self.shader_stack.multi_shader_creator(input_shader=FullScreenPatternShader, number_of_shaders=2, base_number=4,
+        #                                        base_addition=16, base_rgb=(1.25, 0.0, 0.0))
+        # self.shader_stack.add_to_shader_stack(
+        #     FullScreenPatternShader(count_number_max=32, shader_colour=(0.0, 1.25, 0.0)))
+        # self.shader_stack.add_to_shader_stack(
+        #     FullScreenPatternShader(count_number_max=31, shader_colour=(0.0, 0.0, 1.25)))
 
         # self.shader_stack.add_to_shader_stack(
         #     FullScreenPatternShader(count_number_max=7, shader_colour=(0.0, 1.0, 0.0)))
@@ -62,12 +62,12 @@ class FrameBuffer:
         self.motion_blur = MotionBlurShader()
 
         self.motion_blur.shader_colour = (0.0, 0.0, 0.0)
-        self.motion_blur.static_shader_alpha = 0.6
+        self.motion_blur.static_shader_alpha = 0.9
 
         self.lighting = PerPixelLightingShader()
         self.lighting.shader_colour = (1.0, 1.0, 1.0)
         self.lighting.light_strength = 10.0
-        self.lighting.moving_light = True
+        self.lighting.moving_light = False
 
         self.tone_map = ToneMapShader()
 
@@ -164,24 +164,10 @@ class ScreenDrawer:
          for coord in
          self.session_info.coord_map]
 
-    def reactive_background_shader_pass(self):
-        # this changes the background patterns in relation to entities on screen
-        [self.frame_buffer_access.write_to_render_plane(coord,
-                                                        self.frame_buffer_access.shader_stack.run_shader_stack(pixel))
-         for coord, pixel in
-         self.frame_buffer_access.front_buffer.items()]
-
     def lighting_pass(self):
         [self.frame_buffer_access.write_to_render_plane(coord,
                                                         self.frame_buffer_access.lighting.run_shader(coord, pixel))
          for coord, pixel in self.frame_buffer_access.render_plane.items()]
-
-    def weird_lighting_thing(self):
-        # found this accidentally, makes some cool pattern
-        [self.frame_buffer_access.write_to_render_plane(coord, self.frame_buffer_access.lighting.run_shader(coord,
-                                                                                                            self.frame_buffer_access.return_buffer()[
-                                                                                                                coord]))
-         for coord, pixel in pre_buffer_access.pre_buffer.items()]
 
     def tone_map_pass(self):
         [self.frame_buffer_access.write_to_render_plane(coord, self.frame_buffer_access.tone_map.run_shader(pixel))
@@ -231,9 +217,10 @@ class ScreenDrawer:
         self.frame_buffer_access.flush_buffer()
 
     def draw(self):
+        # you can get some different/cool effects by swapping things about here
         render_stack = ['background_shader_pass', 'object_colour_pass', 'lighting_pass', 'motion_blur_pass',
-                        'log_current_frame',
-                        'tone_map_pass', 'render_frame_buffer', 'float_to_rgb_pass', 'buffer_scan', 'flush_buffer']
+                        'log_current_frame', 'tone_map_pass', 'render_frame_buffer', 'float_to_rgb_pass', 'buffer_scan',
+                        'flush_buffer']
 
         try:
             while True:
