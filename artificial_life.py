@@ -823,6 +823,7 @@ def main():
                 # on by 1
                 current_session.current_layer += 1
                 # for each life_form_id in the list use the life_form_id of the life form to work from
+                # replace with map()?
                 for life_form in LifeForm.lifeforms.copy().values():
                     # call expiry function for current life form and update the list of life forms
                     # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
