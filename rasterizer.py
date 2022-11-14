@@ -220,8 +220,13 @@ class ScreenDrawer:
 
     def draw(self):
         # you can get some different/cool effects by swapping things about here
-        render_stack = ['background_shader_pass', 'object_colour_pass', 'lighting_pass', 'motion_blur_pass',
-                        'log_current_frame', 'tone_map_pass', 'render_frame_buffer', 'float_to_rgb_pass', 'buffer_scan',
+        render_stack = ['background_shader_pass',
+                        'object_colour_pass',
+                        'log_current_frame',
+                        'tone_map_pass',
+                        'render_frame_buffer',
+                        'float_to_rgb_pass',
+                        'buffer_scan',
                         'flush_buffer']
 
         try:
