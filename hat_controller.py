@@ -51,7 +51,7 @@ class HATController:
         elif hat_edition == "CUSTOM":
             # unicorn hat + unicorn hat hd setup
             try:
-                self. unicorn = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
+                self.unicorn = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
             except NameError:
                 logger.info(f"Custom mode set without simulator mode on, defaulting to HD physical HAT")
                 self.unicorn = unicornhd

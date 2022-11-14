@@ -1,12 +1,12 @@
 from time import time
 import logging
-from renderer.shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, FullScreenGradientShader, \
+from renderer.shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, \
+    FullScreenGradientShader, \
     FloatToRGBShader, ShaderStack, ToneMapShader
 
 logger = logging.getLogger("rasterizer-logger")
 
 
-# todo: move the pre-buffer into artificial_life.py ?
 class PreBuffer:
     def __init__(self):
         self.template_pre_buffer = {}
@@ -137,9 +137,9 @@ class FrameBuffer:
 
 
 class ScreenDrawer:
-    def __init__(self, hat_controller, buffer_refresh, session_info):
+    def __init__(self, output_controller, buffer_refresh, session_info):
         self.session_info = session_info
-        self.hat_control = hat_controller
+        self.hat_control = output_controller
         self.frame_refresh_delay_ms = 1 / buffer_refresh
         logger.debug(f'Milliseconds per-frame to aim for: {self.frame_refresh_delay_ms}')
 
