@@ -1,6 +1,6 @@
 from time import time
 import logging
-from shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, FullScreenGradientShader, \
+from renderer.shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, FullScreenGradientShader, \
     FloatToRGBShader, ShaderStack, ToneMapShader
 
 logger = logging.getLogger("rasterizer-logger")

@@ -10,7 +10,7 @@ from mcpi.minecraft import Minecraft
 
 from hat_controller import HATController
 
-from rasterizer import ScreenDrawer, pre_buffer_access
+from renderer.rasterizer import ScreenDrawer, pre_buffer_access
 
 from threading import Thread
 
