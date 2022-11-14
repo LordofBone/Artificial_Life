@@ -978,4 +978,4 @@ if __name__ == '__main__':
 
     Thread(target=main, daemon=True).start()
 
-    ScreenDrawer(hat_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session)
+    ScreenDrawer(output_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session)
