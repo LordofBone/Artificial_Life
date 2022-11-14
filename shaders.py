@@ -38,7 +38,7 @@ class ShaderStack:
 
     def run_shader_stack(self, pixel_rgb):
         pixel_in = pixel_rgb
-
+        # replace with map()?
         for shader in self.shader_stack.values():
             pixel_in = shader.run_shader(pixel_in)
 
