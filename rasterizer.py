@@ -205,9 +205,11 @@ class ScreenDrawer:
             if new_pixel:
                 self.frame_buffer_access.write_to_render_plane(coord, new_pixel)
 
-    def funky_pass(self):
-        # todo: convert this to list comprehension this is similar to motion blur but it results in some weird/cool
-        #  effects when implemented after background etc. passes
+    def lensing_pass(self):
+        # todo: convert this to list comprehension
+        # this is similar function to motion blur but it results in some
+        # weird/cool effects when implemented after background and lighting passes, causes the background to react
+        # to the lighting
         for coord, pixel in self.frame_buffer_access.return_previous_frame().items():
             new_pixel = self.frame_buffer_access.motion_blur.run_shader(pixel)
             if new_pixel:
