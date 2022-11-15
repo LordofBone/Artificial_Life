@@ -13,11 +13,11 @@ from mcpi.minecraft import Minecraft
 
 from hat_controller import HATController
 
-renderer_dir = os.path.join(os.path.dirname(__file__), 'renderer')
+renderer_dir = os.path.join(os.path.dirname(__file__), 'pixel_composer')
 
 sys.path.append(renderer_dir)
 
-from renderer.rasterizer import ScreenDrawer, pre_buffer_access
+from pixel_composer.rasterizer import ScreenDrawer, pre_buffer_access
 
 from threading import Thread
 

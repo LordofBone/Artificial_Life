@@ -1,0 +1,3 @@
+[submodule "pixel_composer"]
+	path = pixel_composer
+	url = https://github.com/LordofBone/pixel_composer
