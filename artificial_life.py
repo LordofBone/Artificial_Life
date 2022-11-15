@@ -985,4 +985,7 @@ if __name__ == '__main__':
 
     Thread(target=main, daemon=True).start()
 
-    ScreenDrawer(output_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session)
+    ScreenDrawer(output_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session,
+                 exit_text='Program ended by user.\n Total life forms produced: ${life_form_total_count}\n Max '
+                           'concurrent Lifeforms was: ${highest_concurrent_lifeforms}\n Last count of active '
+                           'Lifeforms: ${current_life_form_amount}')
