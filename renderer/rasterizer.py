@@ -1,6 +1,6 @@
 from time import time
 import logging
-from renderer.shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, \
+from shaders import FullScreenPatternShader, PerPixelLightingShader, MotionBlurShader, \
     FullScreenGradientShader, \
     FloatToRGBShader, ShaderStack, ToneMapShader
 

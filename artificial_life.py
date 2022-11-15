@@ -2,6 +2,9 @@ import argparse
 import logging
 import random
 
+import os
+import sys
+
 from time import time
 
 from dataclasses import dataclass
@@ -9,6 +12,10 @@ from dataclasses import dataclass
 from mcpi.minecraft import Minecraft
 
 from hat_controller import HATController
+
+renderer_dir = os.path.join(os.path.dirname(__file__), 'renderer')
+
+sys.path.append(renderer_dir)
 
 from renderer.rasterizer import ScreenDrawer, pre_buffer_access
 
