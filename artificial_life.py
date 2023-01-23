@@ -92,7 +92,7 @@ class LifeForm:
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
-        self.red_color = random.uniform(0, 10)
+        self.red_color = random.uniform(0, 1)
         self.breed_threshold = random.randint(0, args.max_num)
         self.combine_threshold = random.randint(0, args.max_num)
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
@@ -101,7 +101,7 @@ class LifeForm:
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
-        self.green_color = random.uniform(0, 10)
+        self.green_color = random.uniform(0, 1)
         self.aggression_factor = random.randint(0, args.max_num)
         self.time_to_move = random.randint(1, args.max_num)
         self.time_to_move_count = self.time_to_move
@@ -110,7 +110,7 @@ class LifeForm:
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
         random.seed(self.life_seed3)
-        self.blue_color = random.uniform(0, 10)
+        self.blue_color = random.uniform(0, 1)
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
 
@@ -822,8 +822,13 @@ def main():
     first_run = True
     next_frame = time() + frame_refresh_delay_ms
     while True:
-        if time() > next_frame or not refresh_logic_link and pre_buffer_access.buffer_ready:
-
+        # todo: add in a check to see if the buffer is ready to be written to before writing to it, will need to
+        #  implement a buffer ready flag on the rasterizer side of things also
+        # if time() > next_frame or not refresh_logic_link and pre_buffer_access.buffer_ready:
+        # for now this just checks whether the next frame time is ready or whether refresh logic is disabled
+        # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
+        # but the display will always be behind resulting in entities looking like they are teleporting around
+        if time() > next_frame or not refresh_logic_link:
             # check the list of entities has items within
             if LifeForm.lifeforms.values():
                 # for time the current set of life forms is processed increase the layer for minecraft to set blocks
