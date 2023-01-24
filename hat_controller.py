@@ -3,8 +3,8 @@ import logging
 logger = logging.getLogger("hat-controller-logger")
 
 
-class HATController:
-    def __init__(self, hat_edition, simulator, custom_size_simulator, led_brightness):
+class UnicornHATController:
+    def __init__(self, screen_type, simulator, custom_size_simulator, led_brightness):
         self.simulator_refresh = False
 
         try:
@@ -12,10 +12,15 @@ class HATController:
             import unicornhathd as unicornhd
             from unicornhatmini import UnicornHATMini
         except ImportError:
-            from unicorn_hat_sim import UnicornHatSim
-            from unicorn_hat_sim import unicornhat as unicorn
-            from unicorn_hat_sim import unicornhathd as unicornhd
-            from unicorn_hat_sim import unicornphat as UnicornHATMini
+            try:
+                from unicorn_hat_sim import UnicornHatSim
+                from unicorn_hat_sim import unicornhat as unicorn
+                from unicorn_hat_sim import unicornhathd as unicornhd
+                from unicorn_hat_sim import unicornphat as UnicornHATMini
+            except ModuleNotFoundError:
+                pass
+        except:
+            pass
 
             self.simulator_refresh = True
 
@@ -28,58 +33,44 @@ class HATController:
 
             self.simulator_refresh = True
 
-        if hat_edition == "MINI":
+        if screen_type == "MINI":
             # unicorn hat mini setup
             # todo: figure out why this doesn't work with the phat simulator
             try:
-                self.unicorn = UnicornHATMini()
-                self.unicorn.set_brightness(led_brightness)
-                self.unicorn.set_rotation(0)
+                self.screen = UnicornHATMini()
+                self.screen.set_brightness(led_brightness)
+                self.screen.set_rotation(0)
             except TypeError:
-                self.unicorn = UnicornHATMini
-        elif hat_edition == "SD":
+                self.screen = UnicornHATMini
+        elif screen_type == "SD":
             # unicorn hat + unicorn hat hd setup
-            self.unicorn.set_layout(self.unicorn.AUTO)
-            self.unicorn.brightness(led_brightness)
-            self.unicorn.rotation(0)
-        elif hat_edition == "HD":
+            self.screen.set_layout(self.screen.AUTO)
+            self.screen.brightness(led_brightness)
+            self.screen.rotation(0)
+        elif screen_type == "HD":
             # unicorn hat + unicorn hat hd setup
-            self.unicorn = unicornhd
-            self.unicorn.set_layout(self.unicorn.AUTO)
-            self.unicorn.brightness(led_brightness)
-            self.unicorn.rotation(270)
-        elif hat_edition == "CUSTOM":
+            self.screen = unicornhd
+            self.screen.set_layout(self.screen.AUTO)
+            self.screen.brightness(led_brightness)
+            self.screen.rotation(270)
+        elif screen_type == "CUSTOM":
             # unicorn hat + unicorn hat hd setup
             try:
-                self.unicorn = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
+                self.screen = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
             except NameError:
                 logger.info(f"Custom mode set without simulator mode on, defaulting to HD physical HAT")
-                self.unicorn = unicornhd
-                hat_edition = "HD"
-            self.unicorn.set_layout(self.unicorn.AUTO)
-            self.unicorn.brightness(led_brightness)
-            self.unicorn.rotation(0)
+                self.screen = unicornhd
+                screen_type = "HD"
+            self.screen.set_layout(self.screen.AUTO)
+            self.screen.brightness(led_brightness)
+            self.screen.rotation(0)
             self.simulator_refresh = True
 
-        self.u_width, self.u_height = self.unicorn.get_shape()
-        # the unicorn hat led addresses are 0 indexed so need to account for this
-        self.u_width_max = self.u_width - 1
-        self.u_height_max = self.u_height - 1
+    def get_shape(self):
+        return self.screen.get_shape()
 
-    def draw_pixels(self, pixel_coord, pixel_rgb, current_layer=0):
-        """
-        Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
-        relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
-        amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
-        """
-        try:
-            self.unicorn.set_pixel(pixel_coord[0], pixel_coord[1], pixel_rgb[0], pixel_rgb[1], pixel_rgb[2])
-        except IndexError:
-            raise Exception(f"Set pixel did not like pixel coordinate: {pixel_coord} with RGB value: {pixel_rgb}")
-        # todo: improve this greatly and move it out of this class/module
-        # if args.mc_mode:
-        #     player_x, player_y, player_z = mc.player.getPos()
-        #     random.seed(r + g + b)
-        #     random_block = random.randint(1, 22)
-        #     random.seed()
-        #     mc.setBlock(player_x + x, player_y + 10 + current_layer, player_z + y, random_block)
+    def set_pixel(self, x, y, r, g, b):
+        self.screen.set_pixel(x, y, r, g, b)
+
+    def show(self):
+        self.screen.show()
