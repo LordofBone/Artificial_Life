@@ -9,15 +9,15 @@ from time import time
 
 from dataclasses import dataclass
 
-from mcpi.minecraft import Minecraft
+# from mcpi.minecraft import Minecraft
 
-from hat_controller import HATController
+from screen_output import ScreenController
 
 renderer_dir = os.path.join(os.path.dirname(__file__), 'pixel_composer')
 
 sys.path.append(renderer_dir)
 
-from pixel_composer.rasterizer import ScreenDrawer, pre_buffer_access
+from pixel_composer.rasterizer import ScreenDrawer
 
 from threading import Thread
 
@@ -51,9 +51,38 @@ class Session:
                                  'get_position_down_and_right')
 
     def __post_init__(self):
-        self.coord_map = tuple((x, y) for x in range(HATControl.u_width) for y in range(HATControl.u_height))
+        self.coord_map = tuple(
+            (x, y) for x in range(ScreenController.u_width) for y in range(ScreenController.u_height))
 
         self.free_board_positions = list(self.coord_map)
+
+    class WorldSpaceControl:
+        def __init__(self):
+            self.template_world_space = {}
+
+            self.world_space = {}
+
+            self.buffer_ready = False
+
+        def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id):
+            self.world_space[pixel_coord] = pixel_rgb, entity_id
+
+        def return_world_space(self):
+            return {key: value[0] for key, value in self.world_space.copy().items()}
+
+        def get_from_world_space(self, pixel_coord):
+            try:
+                return self.world_space[pixel_coord]
+            except KeyError:
+                return None
+
+        def del_world_space_item(self, coord):
+            try:
+                del self.world_space[coord]
+            except KeyError:
+                pass
+
+    world_space_access = WorldSpaceControl()
 
 
 class LifeForm:
@@ -92,7 +121,10 @@ class LifeForm:
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
-        self.red_color = random.uniform(0, 1)
+        if not args.fixed_function:
+            self.red_color = random.uniform(0, 1)
+        else:
+            self.red_color = random.randint(0, 255)
         self.breed_threshold = random.randint(0, args.max_num)
         self.combine_threshold = random.randint(0, args.max_num)
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
@@ -101,7 +133,10 @@ class LifeForm:
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
         random.seed(self.life_seed2)
-        self.green_color = random.uniform(0, 1)
+        if not args.fixed_function:
+            self.green_color = random.uniform(0, 1)
+        else:
+            self.green_color = random.randint(0, 255)
         self.aggression_factor = random.randint(0, args.max_num)
         self.time_to_move = random.randint(1, args.max_num)
         self.time_to_move_count = self.time_to_move
@@ -110,7 +145,10 @@ class LifeForm:
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
         random.seed(self.life_seed3)
-        self.blue_color = random.uniform(0, 1)
+        if not args.fixed_function:
+            self.blue_color = random.uniform(0, 1)
+        else:
+            self.blue_color = random.randint(0, 255)
         self.time_to_live = random.randint(0, args.max_num)
         self.time_to_live_count = self.time_to_live
 
@@ -134,8 +172,9 @@ class LifeForm:
 
         self.lifeforms.update({self.life_form_id: self})
 
-        pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
-                                          (self.red_color, self.green_color, self.blue_color), self.life_form_id)
+        current_session.world_space_access.write_to_world_space((self.matrix_position_x, self.matrix_position_y),
+                                                                (self.red_color, self.green_color, self.blue_color),
+                                                                self.life_form_id)
 
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
@@ -445,15 +484,16 @@ class LifeForm:
         elif not collision_check:
             # todo: tidy up the movement system for less repeated code, so the collision checks are done within the
             #  movement functions
-            pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+            current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
             moved = getattr(self, self.direction)()
             if moved:
                 self.surrounding_positions()
 
                 # write new position in the buffer
-                pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
-                                                  (self.red_color, self.green_color,
-                                                   self.blue_color), self.life_form_id)
+                current_session.world_space_access.write_to_world_space(
+                    (self.matrix_position_x, self.matrix_position_y),
+                    (self.red_color, self.green_color,
+                     self.blue_color), self.life_form_id)
 
                 if args.gravity and (self.strength < self.weight or self.direction == 'still'):
 
@@ -470,15 +510,17 @@ class LifeForm:
                     if collision_check == "Died":
                         return collision_check
                     elif not collision_check:
-                        pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+                        current_session.world_space_access.del_world_space_item(
+                            (self.matrix_position_x, self.matrix_position_y))
                         moved = getattr(self, self.direction)()
                         if moved:
                             self.surrounding_positions()
-                            # pre_buffer_access.del_buffer_pixel(self.prev_matrix_position)
+                            # current_session.world_space_access.del_world_space_item(self.prev_matrix_position)
                             # write new position in the buffer
-                            pre_buffer_access.write_to_buffer((self.matrix_position_x, self.matrix_position_y),
-                                                              (self.red_color, self.green_color,
-                                                               self.blue_color), self.life_form_id)
+                            current_session.world_space_access.write_to_world_space(
+                                (self.matrix_position_x, self.matrix_position_y),
+                                (self.red_color, self.green_color,
+                                 self.blue_color), self.life_form_id)
 
                     self.direction = pre_grav_direction
 
@@ -551,7 +593,7 @@ class LifeForm:
         entity from the board entirely and blank it on top of the alive check that will skip it, to double ensure a
         dead entity is no longer interacted with during a loop that it died in.
         """
-        pre_buffer_access.del_buffer_pixel((self.matrix_position_x, self.matrix_position_y))
+        current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
         self.alive = False
         current_session.last_removal = self.life_form_id
         del LifeForm.lifeforms[self.life_form_id]
@@ -568,10 +610,10 @@ class LifeForm:
                 self.green_color -= 1
             if self.blue_color > 0:
                 self.blue_color -= 1
-            HATControl.unicorn.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color,
-                                         self.green_color,
-                                         self.blue_color)
-            HATControl.unicorn.show()
+            ScreenController.screen.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color,
+                                              self.green_color,
+                                              self.blue_color)
+            ScreenController.screen.show()
         self.life_form_id.entity_remove()
 
     def surrounding_positions(self):
@@ -592,7 +634,7 @@ class LifeForm:
         if args.spawn_collision_detection:
             preferred_spawn_point = getattr(self, self.preferred_breed_direction)()
 
-            data = pre_buffer_access.get_from_buffer(preferred_spawn_point)
+            data = current_session.world_space_access.get_from_world_space(preferred_spawn_point)
 
             if not data:
                 chosen_free_coord = preferred_spawn_point
@@ -602,7 +644,7 @@ class LifeForm:
                 while data:
                     try:
                         chosen_free_coord = collision_map.pop()
-                        data = pre_buffer_access.get_from_buffer(chosen_free_coord)
+                        data = current_session.world_space_access.get_from_world_space(chosen_free_coord)
                     except IndexError:
                         # if no free space is found return None
                         return None
@@ -630,7 +672,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_right())[1]
+                s_item_life_form_id = \
+                    current_session.world_space_access.get_from_world_space(self.get_position_right())[1]
             except TypeError:
                 return False, None
 
@@ -642,7 +685,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_left())[1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_left())[
+                    1]
             except TypeError:
                 return False, None
 
@@ -654,7 +698,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down())[1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_down())[
+                    1]
             except TypeError:
                 return False, None
 
@@ -666,7 +711,7 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up())[1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_up())[1]
             except TypeError:
                 return False, None
 
@@ -678,7 +723,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_right())[1]
+                s_item_life_form_id = \
+                    current_session.world_space_access.get_from_world_space(self.get_position_down_and_right())[1]
             except TypeError:
                 return False, None
 
@@ -689,7 +735,8 @@ class LifeForm:
             if self.get_position_up_and_left() not in current_session.coord_map:
                 return True, None
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_left())[1]
+                s_item_life_form_id = \
+                    current_session.world_space_access.get_from_world_space(self.get_position_up_and_left())[1]
             except TypeError:
                 return False, None
 
@@ -701,7 +748,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_down_and_left())[1]
+                s_item_life_form_id = \
+                    current_session.world_space_access.get_from_world_space(self.get_position_down_and_left())[1]
             except TypeError:
                 return False, None
 
@@ -713,7 +761,8 @@ class LifeForm:
                 return True, None
 
             try:
-                s_item_life_form_id = pre_buffer_access.get_from_buffer(self.get_position_up_and_right())[1]
+                s_item_life_form_id = \
+                    current_session.world_space_access.get_from_world_space(self.get_position_up_and_right())[1]
             except TypeError:
                 return False, None
 
@@ -754,8 +803,8 @@ def global_board_generator():
         return random_free_coord[0], random_free_coord[1]
     else:
         # with no collision detection enabled just choose a random spot
-        post_x_gen = random.randint(0, HATControl.u_width_max)
-        post_y_gen = random.randint(0, HATControl.u_height_max)
+        post_x_gen = random.randint(0, ScreenController.u_width_max)
+        post_y_gen = random.randint(0, ScreenController.u_height_max)
 
         return post_x_gen, post_y_gen
 
@@ -824,7 +873,7 @@ def main():
     while True:
         # todo: add in a check to see if the buffer is ready to be written to before writing to it, will need to
         #  implement a buffer ready flag on the rasterizer side of things also
-        # if time() > next_frame or not refresh_logic_link and pre_buffer_access.buffer_ready:
+        # if time() > next_frame or not refresh_logic_link and current_session.world_space_access.buffer_ready:
         # for now this just checks whether the next frame time is ready or whether refresh logic is disabled
         # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
         # but the display will always be behind resulting in entities looking like they are teleporting around
@@ -876,10 +925,10 @@ def main():
 
                     # some debug-like code to identify when a life form goes outside the LED board
                     if life_form.matrix_position_x < 0 or \
-                            life_form.matrix_position_x > HATControl.u_width_max:
+                            life_form.matrix_position_x > ScreenController.u_width_max:
                         raise Exception("Life form has exceeded x axis")
                     if life_form.matrix_position_y < 0 or \
-                            life_form.matrix_position_y > HATControl.u_height_max:
+                            life_form.matrix_position_y > ScreenController.u_height_max:
                         raise Exception("Life form has exceeded y axis")
 
             # if the main list of entities is empty then all have expired; the program displays final information
@@ -967,30 +1016,44 @@ if __name__ == '__main__':
                         help='Whether to use the Unicorn HAT simulator or not')
 
     parser.add_argument('-hm', '--hat-model', action="store", dest="hat_edition", type=str, default=hat_model,
-                        choices=['SD', 'HD', 'MINI', 'CUSTOM'], help='What type of HAT the program is using. CUSTOM '
-                                                                     'only works with Unicorn HAT Simulator')
+                        choices=['SD', 'HD', 'MINI', 'PANEL', 'CUSTOM'],
+                        help='What type of HAT the program is using. CUSTOM '
+                             'only works with Unicorn HAT Simulator')
 
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
+
+    parser.add_argument('-ff', '--fixed-function', action="store_true", dest="fixed_function",
+                        help='Whether to bypass pixel composer and use fixed function '
+                             'for drawing (faster, less pretty)')
 
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level)
 
-    HATControl = HATController(hat_edition=args.hat_edition, simulator=args.simulator,
-                               custom_size_simulator=args.custom_size_simulator, led_brightness=led_brightness)
+    ScreenController = ScreenController(screen_type=args.hat_edition, simulator=args.simulator,
+                                        custom_size_simulator=args.custom_size_simulator, led_brightness=led_brightness)
 
     # setup Minecraft connection if mc_mode is True
-    if args.mc_mode:
-        mc = Minecraft.create()
-        mc.postToChat("PiLife Plugged into Minecraft!")
+    # if args.mc_mode:
+    #     mc = Minecraft.create()
+    #     mc.postToChat("PiLife Plugged into Minecraft!")
 
     current_session = Session(life_form_total_count=args.life_form_total, draw_trails=args.trails_on,
                               retries=args.retry_on, highest_concurrent_lifeforms=args.life_form_total)
 
     Thread(target=main, daemon=True).start()
 
-    ScreenDrawer(output_controller=HATControl, buffer_refresh=hat_buffer_refresh_rate, session_info=current_session,
-                 exit_text='Program ended by user.\n Total life forms produced: ${life_form_total_count}\n Max '
-                           'concurrent Lifeforms was: ${highest_concurrent_lifeforms}\n Last count of active '
-                           'Lifeforms: ${current_life_form_amount}')
+    if not args.fixed_function:
+        ScreenDrawer(output_controller=ScreenController, buffer_refresh=hat_buffer_refresh_rate,
+                     session_info=current_session,
+                     exit_text='Program ended by user.\n Total life forms produced: ${life_form_total_count}\n Max '
+                               'concurrent Lifeforms was: ${highest_concurrent_lifeforms}\n Last count of active '
+                               'Lifeforms: ${current_life_form_amount}')
+    else:
+        while True:
+            [ScreenController.draw_pixels(coord, (0, 0, 0)) for coord in
+             current_session.coord_map]
+            [ScreenController.draw_pixels(coord, pixel[0]) for coord, pixel in
+             current_session.world_space_access.world_space.copy().items()]
+            ScreenController.show()
