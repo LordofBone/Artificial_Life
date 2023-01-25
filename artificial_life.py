@@ -976,7 +976,7 @@ if __name__ == '__main__':
                         help='Whether to adjust radiation levels across the simulation or not')
 
     parser.add_argument('-r', '--radiation', action="store", dest="radiation", type=int, default=initial_radiation,
-                        help='Radiation enabled, will increase random mutation chance')
+                        help='Radiation enabled, will increase random mutation chance and damage entities')
 
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
