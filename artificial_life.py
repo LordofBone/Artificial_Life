@@ -29,16 +29,17 @@ logger = logging.getLogger("alife-logger")
 
 # todo: move this into the class
 def find_adjacent_positions(grid, object_position):
-    adjacent_positions = []
+    surrounding_positions = []
     x, y = object_position
-    for dx in [-1, 0, 1]:
-        for dy in [-1, 0, 1]:
-            if dx == 0 and dy == 0:
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            if i == 0 and j == 0:
                 continue
-            new_x, new_y = x + dx, y + dy
-            if 0 <= new_x < grid[-1][0] and 0 <= new_y < grid[-1][1]:
-                adjacent_positions.append((new_x, new_y))
-    return tuple(adjacent_positions)
+            new_row, new_col = x + i, y + j
+            if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
+                surrounding_positions.append((new_row, new_col))
+    return surrounding_positions
+
 
 
 @dataclass
@@ -107,7 +108,7 @@ class LifeForm:
     # dictionary to hold all instances of this class
     lifeforms = {}
 
-    def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y):
+    def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand=0):
         """
         When class initialised it gives the life form its properties from the random numbers inserted into it,
         the life seeds are used to seed random number generators that then are used to generate the life form
@@ -132,6 +133,10 @@ class LifeForm:
         self.life_seed1 = seed
         self.life_seed2 = seed2
         self.life_seed3 = seed3
+
+        random.seed(self.life_seed1 + self.life_seed2 + self.life_seed3)
+        self.max_attribute = random.randint(1, args.max_num) + max_attrib_expand
+
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
         random.seed(self.life_seed1)
@@ -139,10 +144,10 @@ class LifeForm:
             self.red_color = random.uniform(0, 1)
         else:
             self.red_color = random.randint(0, 255)
-        self.breed_threshold = random.randint(0, args.max_num)
-        self.combine_threshold = random.randint(0, args.max_num)
+        self.breed_threshold = random.randint(0, self.max_attribute)
+        self.combine_threshold = random.randint(0, self.max_attribute)
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
-        self.strength = random.randint(0, args.max_num)
+        self.strength = random.randint(0, self.max_attribute)
 
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
@@ -151,10 +156,10 @@ class LifeForm:
             self.green_color = random.uniform(0, 1)
         else:
             self.green_color = random.randint(0, 255)
-        self.aggression_factor = random.randint(0, args.max_num)
-        self.time_to_move = random.randint(1, args.max_num)
+        self.aggression_factor = random.randint(0, self.max_attribute)
+        self.time_to_move = random.randint(1, self.max_attribute)
         self.time_to_move_count = self.time_to_move
-        self.weight = random.randint(0, args.max_num)
+        self.weight = random.randint(0, self.max_attribute)
 
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
@@ -163,7 +168,7 @@ class LifeForm:
             self.blue_color = random.uniform(0, 1)
         else:
             self.blue_color = random.randint(0, 255)
-        self.time_to_live = random.randint(0, args.max_num)
+        self.time_to_live = random.randint(0, self.max_attribute)
         self.time_to_live_count = self.time_to_live
 
         self.direction = random.choice(current_session.directions)
@@ -189,6 +194,27 @@ class LifeForm:
         current_session.world_space_access.write_to_world_space((self.matrix_position_x, self.matrix_position_y),
                                                                 (self.red_color, self.green_color, self.blue_color),
                                                                 self.life_form_id)
+
+    def get_dna(self, dna_key, collided_life_form_id):
+        dna_chaos = random.randint(1, 100)
+        if dna_chaos <= args.dna_chaos:
+            return get_random()
+        else:
+            if dna_key == 1:
+                if fifty_fifty():
+                    return self.life_seed1
+                else:
+                    return LifeForm.lifeforms[collided_life_form_id].life_seed1
+            elif dna_key == 2:
+                if fifty_fifty():
+                    return self.life_seed2
+                else:
+                    return LifeForm.lifeforms[collided_life_form_id].life_seed2
+            elif dna_key == 3:
+                if fifty_fifty():
+                    return self.life_seed3
+                else:
+                    return LifeForm.lifeforms[collided_life_form_id].life_seed3
 
     def collision_factory(self):
         # check for any collisions with any other entities and return the life_form_id of an entity
@@ -256,43 +282,19 @@ class LifeForm:
                             # increase the life form total by 1
                             current_session.life_form_total_count += 1
 
-                            # the below assigns all 3 life seeds with the potential to take the life seed
-                            # from either parent (50% chance each), or whether a new random life seed will be
-                            # inserted (chance determined by parameter), resulting in some genetic chaos to
-                            # change offspring randomly
-                            dna_transfer_capsule = {'transfer_dna_1': 0, 'transfer_dna_2': 0,
-                                                    'transfer_dna_3': 0}
-
-                            for key in dna_transfer_capsule.keys():
-
-                                dna_chaos = random.randint(1, 100)
-                                if dna_chaos <= args.dna_chaos:
-                                    dna_transfer_capsule[key] = get_random()
-                                else:
-                                    if key == 'transfer_dna_1':
-                                        if fifty_fifty():
-                                            dna_transfer_capsule[key] = self.life_seed1
-                                        else:
-                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
-                                                collided_life_form_id].life_seed1
-                                    elif key == 'transfer_dna_2':
-                                        if fifty_fifty():
-                                            dna_transfer_capsule[key] = self.life_seed2
-                                        else:
-                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
-                                                collided_life_form_id].life_seed2
-                                    elif key == 'transfer_dna_3':
-                                        if fifty_fifty():
-                                            dna_transfer_capsule[key] = self.life_seed3
-                                        else:
-                                            dna_transfer_capsule[key] = LifeForm.lifeforms[
-                                                collided_life_form_id].life_seed3
+                            if fifty_fifty():
+                                attrib_boost = self.max_attribute
+                            else:
+                                attrib_boost = LifeForm.lifeforms[collided_life_form_id].max_attribute
 
                             LifeForm(
                                 life_form_id=current_session.life_form_total_count,
-                                seed=dna_transfer_capsule['transfer_dna_1'],
-                                seed2=dna_transfer_capsule['transfer_dna_2'],
-                                seed3=dna_transfer_capsule['transfer_dna_3'], start_x=post_x_gen, start_y=post_y_gen)
+                                seed=self.get_dna(1, collided_life_form_id),
+                                seed2=self.get_dna(2, collided_life_form_id),
+                                seed3=self.get_dna(3, collided_life_form_id),
+                                start_x=post_x_gen,
+                                start_y=post_y_gen,
+                                max_attrib_expand=attrib_boost)
 
                             logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
@@ -318,7 +320,7 @@ class LifeForm:
         # if the other entities' aggression factor is lower it will be killed and removed from the
         # main loops list of entities
 
-        if LifeForm.lifeforms[other_life_form_id].aggression_factor < self.aggression_factor:
+        if LifeForm.lifeforms[other_life_form_id].strength < self.strength:
             logger.debug('Other entity killed')
 
             self.time_to_live_count += LifeForm.lifeforms[other_life_form_id].time_to_live_count
@@ -333,7 +335,7 @@ class LifeForm:
 
         # if the other entities' aggression factor is higher it will be killed the current entity
         # it will be removed from the main loops list of entities
-        elif LifeForm.lifeforms[other_life_form_id].aggression_factor > self.aggression_factor:
+        elif LifeForm.lifeforms[other_life_form_id].strength > self.strength:
             logger.debug('Current entity killed')
 
             LifeForm.lifeforms[other_life_form_id].time_to_live_count += self.time_to_live_count
@@ -342,7 +344,7 @@ class LifeForm:
 
             return "Died"
 
-        elif LifeForm.lifeforms[other_life_form_id].aggression_factor == self.aggression_factor:
+        elif LifeForm.lifeforms[other_life_form_id].strength == self.strength:
             logger.debug('Entities matched, flipping coin')
 
             if fifty_fifty():
@@ -386,44 +388,44 @@ class LifeForm:
         logger.debug(f'Color: R: {self.red_color} G: {self.green_color} B: {self.blue_color} \n')
 
     def get_position_up(self):
-        self.position = (self.matrix_position_x, self.matrix_position_y - 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x, self.matrix_position_y - 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_down(self):
-        self.position = (self.matrix_position_x, self.matrix_position_y + 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x, self.matrix_position_y + 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_left(self):
-        self.position = (self.matrix_position_x - 1, self.matrix_position_y)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x - 1, self.matrix_position_y)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_right(self):
-        self.position = (self.matrix_position_x + 1, self.matrix_position_y)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x + 1, self.matrix_position_y)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_up_and_right(self):
-        self.position = (self.matrix_position_x + 1, self.matrix_position_y - 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x + 1, self.matrix_position_y - 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_up_and_left(self):
-        self.position = (self.matrix_position_x - 1, self.matrix_position_y - 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x - 1, self.matrix_position_y - 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_down_and_right(self):
-        self.position = (self.matrix_position_x + 1, self.matrix_position_y + 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x + 1, self.matrix_position_y + 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def get_position_down_and_left(self):
-        self.position = (self.matrix_position_x - 1, self.matrix_position_y + 1)
-        if self.position not in current_session.coord_map:
-            self.position = None
+        self.adj_position = (self.matrix_position_x - 1, self.matrix_position_y + 1)
+        if self.adj_position not in current_session.coord_map:
+            self.adj_position = None
 
     def move_up(self):
         self.matrix_position_y -= 1
@@ -639,20 +641,23 @@ class LifeForm:
         if args.spawn_collision_detection:
             getattr(self, self.preferred_breed_direction)()
 
-            preferred_spawn_point = self.position
+            preferred_spawn_point = self.adj_position
 
             data = current_session.world_space_access.get_from_world_space(preferred_spawn_point)
 
             if not data:
                 chosen_free_coord = preferred_spawn_point
             else:
-                collision_map = list(self.positions_around_life_form)
-                random.shuffle(collision_map)
+                collision_map = list(self.adj_position)
+
                 while data:
                     try:
-                        chosen_free_coord = collision_map.pop()
+                        chosen_free_coord = collision_map.pop(random.randrange(len(collision_map)))
                         data = current_session.world_space_access.get_from_world_space(chosen_free_coord)
                     except IndexError:
+                        # if no free space is found return None
+                        return None
+                    except ValueError:
                         # if no free space is found return None
                         return None
 
@@ -676,107 +681,28 @@ class LifeForm:
         # another, if so return the id of the other life form
         if self.direction == 'move_right':
             self.get_position_right()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_left':
             self.get_position_left()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_down':
             self.get_position_down()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_up':
             self.get_position_up()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_down_and_right':
             self.get_position_down_and_right()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_up_and_left':
             self.get_position_up_and_left()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_down_and_left':
             self.get_position_down_and_left()
-            if not self.position:
-                return True, None
-
-            try:
-                s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.position)[1]
-            except TypeError:
-                return False, None
-
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
-
         elif self.direction == 'move_up_and_right':
             self.get_position_up_and_right()
-            if not self.position:
+
+        if not self.direction == 'still':
+            if not self.adj_position:
                 return True, None
 
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.position)[1]
+                    current_session.world_space_access.get_from_world_space(self.adj_position)[1]
             except TypeError:
                 return False, None
 
@@ -982,7 +908,7 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Artificial Life')
 
-    parser.add_argument('-m', '--max-num', action="store_true", dest="max_num", default=max_trait_number,
+    parser.add_argument('-m', '--max-num', action="store", type=int, dest="max_num", default=max_trait_number,
                         help='Maximum number possible for any entity traits')
 
     parser.add_argument('-ilc', '--initial-lifeforms-count', action="store", dest="life_form_total", type=int,
