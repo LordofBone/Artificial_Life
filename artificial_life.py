@@ -1,17 +1,15 @@
 import argparse
 import logging
-import random
-
 import os
+import random
 import sys
-
+from dataclasses import dataclass
+import statistics
 from time import time
 
-from dataclasses import dataclass
+from screen_output import ScreenController
 
 # from mcpi.minecraft import Minecraft
-
-from screen_output import ScreenController
 
 renderer_dir = os.path.join(os.path.dirname(__file__), 'pixel_composer')
 
@@ -21,10 +19,15 @@ from pixel_composer.rasterizer import ScreenDrawer
 
 from threading import Thread
 
-from config.parameters import initial_lifeforms_count, population_limit, logging_level, dna_chaos_chance, \
-    led_brightness, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number
+from config.parameters import initial_lifeforms_count, population_limit, logging_level, initial_dna_chaos_chance, \
+    led_brightness, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number, \
+    initial_radiation
 
 logger = logging.getLogger("alife-logger")
+
+
+def clamp(n, minn, maxn):
+    return max(min(maxn, n), minn)
 
 
 # todo: move this into the class
@@ -41,7 +44,6 @@ def find_adjacent_positions(grid, object_position):
     return surrounding_positions
 
 
-
 @dataclass
 class Session:
     """
@@ -51,6 +53,10 @@ class Session:
     highest_concurrent_lifeforms: int
     draw_trails: bool
     retries: bool
+    radiation_change: bool
+    radiation: int
+    radiation_curve = [(0, 0.5), (1, 2), (2, 1), (3, 1.5)]
+    dna_chaos_chance: int
     coord_map: tuple = ()
     last_removal: int = -1
     current_layer: int = 0
@@ -70,6 +76,17 @@ class Session:
             (x, y) for x in range(ScreenController.u_width) for y in range(ScreenController.u_height))
 
         self.free_board_positions = list(self.coord_map)
+
+        self.base_radiation = self.radiation
+
+    def get_dna_chaos_chance(self):
+        return clamp(statistics.median([self.dna_chaos_chance + self.radiation]), 0, 100)
+
+    def adjust_radiation_along_curve(self):
+        # "curve" should be a list of (x, y) points
+        # representing the curve
+        self.radiation = int(self.base_radiation * random.uniform(min([y for x, y in self.radiation_curve]),
+                                                                  max([y for x, y in self.radiation_curve])))
 
     class WorldSpaceControl:
         def __init__(self):
@@ -119,6 +136,8 @@ class LifeForm:
 
         # this list will be used for storing the x, y positions around the life forms location
         self.positions_around_life_form = []
+
+        self.adj_position = None
 
         # set life form life status
         self.alive = True
@@ -197,7 +216,7 @@ class LifeForm:
 
     def get_dna(self, dna_key, collided_life_form_id):
         dna_chaos = random.randint(1, 100)
-        if dna_chaos <= args.dna_chaos:
+        if dna_chaos <= current_session.get_dna_chaos_chance():
             return get_random()
         else:
             if dna_key == 1:
@@ -589,7 +608,7 @@ class LifeForm:
         to live hits zero return True for deletion of the life forms class from the holder.
         """
         if self.time_to_live_count > 0:
-            self.time_to_live_count -= 1
+            self.time_to_live_count -= (1 + current_session.radiation)
             return False
         elif self.time_to_live_count <= 0:
             return True
@@ -611,6 +630,7 @@ class LifeForm:
         """
         Erases an entity from the board by fading it away.
         """
+        # todo: make a shader for this instead
         for c in range(0, 255):
             if self.red_color > 0:
                 self.red_color -= 1
@@ -902,6 +922,9 @@ def main():
 
             logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
 
+            if args.radiation_change:
+                current_session.adjust_radiation_along_curve()
+
             next_frame = time() + frame_refresh_delay_ms
 
 
@@ -925,8 +948,8 @@ if __name__ == '__main__':
                         default=population_limit,
                         help='Limit of the population at any one time')
 
-    parser.add_argument('-dc', '--dna-chaos', action="store", dest="dna_chaos", type=int,
-                        default=dna_chaos_chance,
+    parser.add_argument('-dc', '--dna-chaos', action="store", dest="dna_chaos_chance", type=int,
+                        default=initial_dna_chaos_chance,
                         help='Percentage chance of random DNA upon breeding of entities')
 
     parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", type=tuple,
@@ -948,6 +971,12 @@ if __name__ == '__main__':
 
     parser.add_argument('-g', '--gravity', action="store_true", dest="gravity",
                         help='Gravity enabled, still entities will fall to the floor')
+
+    parser.add_argument('-rc', '--radiation_change', action="store_true", dest="radiation_change",
+                        help='Whether to adjust radiation levels across the simulation or not')
+
+    parser.add_argument('-r', '--radiation', action="store", dest="radiation", type=int, default=initial_radiation,
+                        help='Radiation enabled, will increase random mutation chance')
 
     parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
                         help='Whether the loop will automatically restart upon the expiry of all entities')
@@ -979,13 +1008,19 @@ if __name__ == '__main__':
     #     mc = Minecraft.create()
     #     mc.postToChat("PiLife Plugged into Minecraft!")
 
-    current_session = Session(life_form_total_count=args.life_form_total, draw_trails=args.trails_on,
-                              retries=args.retry_on, highest_concurrent_lifeforms=args.life_form_total)
+    current_session = Session(life_form_total_count=args.life_form_total,
+                              draw_trails=args.trails_on,
+                              retries=args.retry_on,
+                              highest_concurrent_lifeforms=args.life_form_total,
+                              radiation=args.radiation,
+                              dna_chaos_chance=args.dna_chaos_chance,
+                              radiation_change=args.radiation_change)
 
     Thread(target=main, daemon=True).start()
 
     if not args.fixed_function:
-        ScreenDrawer(output_controller=ScreenController, buffer_refresh=hat_buffer_refresh_rate,
+        ScreenDrawer(output_controller=ScreenController,
+                     buffer_refresh=hat_buffer_refresh_rate,
                      session_info=current_session,
                      exit_text='Program ended by user.\n Total life forms produced: ${life_form_total_count}\n Max '
                                'concurrent Lifeforms was: ${highest_concurrent_lifeforms}\n Last count of active '
