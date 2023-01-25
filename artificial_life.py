@@ -27,6 +27,20 @@ from config.parameters import initial_lifeforms_count, population_limit, logging
 logger = logging.getLogger("alife-logger")
 
 
+# todo: move this into the class
+def find_adjacent_positions(grid, object_position):
+    adjacent_positions = []
+    x, y = object_position
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            if dx == 0 and dy == 0:
+                continue
+            new_x, new_y = x + dx, y + dy
+            if 0 <= new_x < grid[-1][0] and 0 <= new_y < grid[-1][1]:
+                adjacent_positions.append((new_x, new_y))
+    return tuple(adjacent_positions)
+
+
 @dataclass
 class Session:
     """
@@ -372,52 +386,44 @@ class LifeForm:
         logger.debug(f'Color: R: {self.red_color} G: {self.green_color} B: {self.blue_color} \n')
 
     def get_position_up(self):
-        position = (self.matrix_position_x, self.matrix_position_y - 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x, self.matrix_position_y - 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_down(self):
-        position = (self.matrix_position_x, self.matrix_position_y + 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x, self.matrix_position_y + 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_left(self):
-        position = (self.matrix_position_x - 1, self.matrix_position_y)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x - 1, self.matrix_position_y)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_right(self):
-        position = (self.matrix_position_x + 1, self.matrix_position_y)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x + 1, self.matrix_position_y)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_up_and_right(self):
-        position = (self.matrix_position_x + 1, self.matrix_position_y - 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x + 1, self.matrix_position_y - 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_up_and_left(self):
-        position = (self.matrix_position_x - 1, self.matrix_position_y - 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x - 1, self.matrix_position_y - 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_down_and_right(self):
-        position = (self.matrix_position_x + 1, self.matrix_position_y + 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x + 1, self.matrix_position_y + 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def get_position_down_and_left(self):
-        position = (self.matrix_position_x - 1, self.matrix_position_y + 1)
-        if position not in current_session.coord_map:
-            return None
-        return position
+        self.position = (self.matrix_position_x - 1, self.matrix_position_y + 1)
+        if self.position not in current_session.coord_map:
+            self.position = None
 
     def move_up(self):
         self.matrix_position_y -= 1
@@ -620,10 +626,9 @@ class LifeForm:
         """
         Creates a list of all x, y points around the entity
         """
-        self.positions_around_life_form = (self.get_position_up(), self.get_position_down(), self.get_position_left(),
-                                           self.get_position_right(), self.get_position_up_and_right(),
-                                           self.get_position_up_and_left(), self.get_position_down_and_left(),
-                                           self.get_position_down_and_right())
+
+        self.positions_around_life_form = find_adjacent_positions(current_session.coord_map, (self.matrix_position_x,
+                                                                                              self.matrix_position_y))
 
     def board_position_generator(self):
         """
@@ -632,7 +637,9 @@ class LifeForm:
         """
         # check area around entity for other life forms
         if args.spawn_collision_detection:
-            preferred_spawn_point = getattr(self, self.preferred_breed_direction)()
+            getattr(self, self.preferred_breed_direction)()
+
+            preferred_spawn_point = self.position
 
             data = current_session.world_space_access.get_from_world_space(preferred_spawn_point)
 
@@ -668,12 +675,13 @@ class LifeForm:
         # using the direction of the current life form determine on next move if the life form were to collide with
         # another, if so return the id of the other life form
         if self.direction == 'move_right':
-            if self.get_position_right() not in current_session.coord_map:
+            self.get_position_right()
+            if not self.position:
                 return True, None
 
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.get_position_right())[1]
+                    current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -681,12 +689,12 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_left':
-            if self.get_position_left() not in current_session.coord_map:
+            self.get_position_left()
+            if not self.position:
                 return True, None
 
             try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_left())[
-                    1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -694,12 +702,12 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_down':
-            if self.get_position_down() not in current_session.coord_map:
+            self.get_position_down()
+            if not self.position:
                 return True, None
 
             try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_down())[
-                    1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -707,11 +715,12 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_up':
-            if self.get_position_up() not in current_session.coord_map:
+            self.get_position_up()
+            if not self.position:
                 return True, None
 
             try:
-                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.get_position_up())[1]
+                s_item_life_form_id = current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -719,12 +728,13 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_down_and_right':
-            if self.get_position_down_and_right() not in current_session.coord_map:
+            self.get_position_down_and_right()
+            if not self.position:
                 return True, None
 
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.get_position_down_and_right())[1]
+                    current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -732,11 +742,13 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_up_and_left':
-            if self.get_position_up_and_left() not in current_session.coord_map:
+            self.get_position_up_and_left()
+            if not self.position:
                 return True, None
+
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.get_position_up_and_left())[1]
+                    current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -744,12 +756,13 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_down_and_left':
-            if self.get_position_down_and_left() not in current_session.coord_map:
+            self.get_position_down_and_left()
+            if not self.position:
                 return True, None
 
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.get_position_down_and_left())[1]
+                    current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
@@ -757,12 +770,13 @@ class LifeForm:
                 return True, s_item_life_form_id
 
         elif self.direction == 'move_up_and_right':
-            if self.get_position_up_and_right() not in current_session.coord_map:
+            self.get_position_up_and_right()
+            if not self.position:
                 return True, None
 
             try:
                 s_item_life_form_id = \
-                    current_session.world_space_access.get_from_world_space(self.get_position_up_and_right())[1]
+                    current_session.world_space_access.get_from_world_space(self.position)[1]
             except TypeError:
                 return False, None
 
