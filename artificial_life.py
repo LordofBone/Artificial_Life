@@ -57,6 +57,7 @@ class Session:
     radiation: int
     radiation_curve = [(0, 0.5), (1, 2), (2, 1), (3, 1.5)]
     dna_chaos_chance: int
+    max_attribute: int
     coord_map: tuple = ()
     last_removal: int = -1
     current_layer: int = 0
@@ -153,8 +154,7 @@ class LifeForm:
         self.life_seed2 = seed2
         self.life_seed3 = seed3
 
-        random.seed(self.life_seed1 + self.life_seed2 + self.life_seed3)
-        self.max_attribute = random.randint(1, args.max_num) + max_attrib_expand
+        self.max_attribute = current_session.max_attribute
 
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
@@ -1014,7 +1014,8 @@ if __name__ == '__main__':
                               highest_concurrent_lifeforms=args.life_form_total,
                               radiation=args.radiation,
                               dna_chaos_chance=args.dna_chaos_chance,
-                              radiation_change=args.radiation_change)
+                              radiation_change=args.radiation_change,
+                              max_attribute=args.max_num)
 
     Thread(target=main, daemon=True).start()
 
