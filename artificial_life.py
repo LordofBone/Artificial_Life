@@ -193,9 +193,6 @@ class LifeForm:
         self.direction = random.choice(current_session.directions)
         self.preferred_direction = self.direction
 
-        self.out_of_moves = False
-        self.attempted_directions = set()
-
         # reset the global random seed
         random.seed()
 
@@ -248,38 +245,9 @@ class LifeForm:
             # in that direction rather than bounce
             self.previous_direction = self.direction
 
-            self.attempted_directions = set()
-
-            self.out_of_moves = False
-
-            self.attempted_directions.add(self.direction)
-
-            # call to randomise direction function for the entity
             self.randomise_direction()
 
-            collision_detected_again, collided_life_form_id_again = self.collision_detector()
-
-            # find a new direction until a free space is found, if nowhere around the life form is clear
-            # it will go to a still state until it attempts to change direction again
-            while collision_detected_again:
-                logger.debug(
-                    f'Collision detected again: {self.life_form_id} collided with {collided_life_form_id_again}, '
-                    f'with previously tried directions: {self.attempted_directions}')
-
-                # storing previously attempted directions so that the same direction is not tried again
-                self.attempted_directions.add(self.direction)
-
-                self.randomise_direction()
-
-                if self.out_of_moves:
-                    break
-
-                collision_detected_again, collided_life_form_id_again = self.collision_detector()
-
             if collided_life_form_id:
-                if collided_life_form_id is None:
-                    raise Exception("Should not reach this point if ID was none")
-
                 # if the aggression factor is below the entities breed threshold the life form will attempt to
                 # breed with the one it collided with
                 if self.aggression_factor < self.breed_threshold:
@@ -448,42 +416,34 @@ class LifeForm:
 
     def move_up(self):
         self.matrix_position_y -= 1
-        return True
 
     def move_down(self):
         self.matrix_position_y += 1
-        return True
 
     def move_left(self):
         self.matrix_position_x -= 1
-        return True
 
     def move_right(self):
         self.matrix_position_x += 1
-        return True
 
     def move_up_and_right(self):
         self.move_up()
         self.move_right()
-        return True
 
     def move_up_and_left(self):
         self.move_up()
         self.move_left()
-        return True
 
     def move_down_and_right(self):
         self.move_down()
         self.move_right()
-        return True
 
     def move_down_and_left(self):
         self.move_down()
         self.move_left()
-        return True
 
     def still(self):
-        return True
+        pass
 
     def movement(self):
         """
@@ -512,46 +472,46 @@ class LifeForm:
             # todo: tidy up the movement system for less repeated code, so the collision checks are done within the
             #  movement functions
             current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
-            moved = getattr(self, self.direction)()
-            if moved:
-                self.surrounding_positions()
+            getattr(self, self.direction)()
 
-                # write new position in the buffer
-                current_session.world_space_access.write_to_world_space(
-                    (self.matrix_position_x, self.matrix_position_y),
-                    (self.red_color, self.green_color,
-                     self.blue_color), self.life_form_id)
+            self.surrounding_positions()
 
-                if args.gravity and (self.strength < self.weight or self.direction == 'still'):
+            # write new position in the buffer
+            current_session.world_space_access.write_to_world_space(
+                (self.matrix_position_x, self.matrix_position_y),
+                (self.red_color, self.green_color,
+                 self.blue_color), self.life_form_id)
 
-                    self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
-                    pre_grav_direction = self.direction
-                    self.direction = 'move_down'
+            if args.gravity and (self.strength < self.weight or self.direction == 'still'):
 
-                    # if entity is dead then skip and return
-                    if not self.alive:
-                        return "Dead"
+                self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
+                pre_grav_direction = self.direction
+                self.direction = 'move_down'
 
-                    collision_check = self.collision_factory()
+                # if entity is dead then skip and return
+                if not self.alive:
+                    return "Dead"
 
-                    if collision_check == "Died":
-                        return collision_check
-                    elif not collision_check:
-                        current_session.world_space_access.del_world_space_item(
-                            (self.matrix_position_x, self.matrix_position_y))
-                        moved = getattr(self, self.direction)()
-                        if moved:
-                            self.surrounding_positions()
-                            # current_session.world_space_access.del_world_space_item(self.prev_matrix_position)
-                            # write new position in the buffer
-                            current_session.world_space_access.write_to_world_space(
-                                (self.matrix_position_x, self.matrix_position_y),
-                                (self.red_color, self.green_color,
-                                 self.blue_color), self.life_form_id)
+                collision_check = self.collision_factory()
 
-                    self.direction = pre_grav_direction
+                if collision_check == "Died":
+                    return collision_check
+                elif not collision_check:
+                    current_session.world_space_access.del_world_space_item(
+                        (self.matrix_position_x, self.matrix_position_y))
+                    moved = getattr(self, self.direction)()
+                    if moved:
+                        self.surrounding_positions()
+                        # current_session.world_space_access.del_world_space_item(self.prev_matrix_position)
+                        # write new position in the buffer
+                        current_session.world_space_access.write_to_world_space(
+                            (self.matrix_position_x, self.matrix_position_y),
+                            (self.red_color, self.green_color,
+                             self.blue_color), self.life_form_id)
 
-                    logger.debug(f"Moved from gravity")
+                self.direction = pre_grav_direction
+
+                logger.debug(f"Moved from gravity")
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
@@ -576,24 +536,10 @@ class LifeForm:
         Select a random new direction for the life form that is not the direction it is
         already going. It also allows for a list of previously attempted directions to be passed in and excluded.
         """
-        if self.direction not in self.attempted_directions:
-            self.attempted_directions.add(self.direction)
-        if self.preferred_direction not in self.attempted_directions:
-            r = self.preferred_direction
+        if not self.direction == self.preferred_direction:
+            self.direction = self.preferred_direction
         else:
-            try:
-                r = random.choice([d for d in current_session.directions if d not in self.attempted_directions])
-                if r in self.attempted_directions:
-                    raise Exception(f"Direction: {r} found in exclusion list: {self.attempted_directions}")
-
-                self.direction = r
-            except IndexError:
-                r = 'still'
-                self.out_of_moves = True
-
-        logger.debug(f"New direction: {r} with exclusion list: {self.attempted_directions}")
-
-        self.direction = r
+            self.direction = random.choice(current_session.directions)
 
     def linked(self, life_form_id):
         """
@@ -726,8 +672,7 @@ class LifeForm:
             except TypeError:
                 return False, None
 
-            if s_item_life_form_id:
-                return True, s_item_life_form_id
+            return True, s_item_life_form_id
 
         return False, None
 
