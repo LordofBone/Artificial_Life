@@ -30,20 +30,6 @@ def clamp(n, minn, maxn):
     return max(min(maxn, n), minn)
 
 
-# todo: move this into the class
-def find_adjacent_positions(grid, object_position):
-    surrounding_positions = []
-    x, y = object_position
-    for i in range(-1, 2):
-        for j in range(-1, 2):
-            if i == 0 and j == 0:
-                continue
-            new_row, new_col = x + i, y + j
-            if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
-                surrounding_positions.append((new_row, new_col))
-    return surrounding_positions
-
-
 @dataclass
 class Session:
     """
@@ -164,7 +150,7 @@ class LifeForm:
         else:
             self.red_color = random.randint(0, 255)
         self.breed_threshold = random.randint(0, self.max_attribute)
-        self.combine_threshold = random.randint(0, self.max_attribute)
+        self.combine_threshold = random.randint(0, self.max_attribute) / 2
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
         self.strength = random.randint(0, self.max_attribute)
 
@@ -189,6 +175,7 @@ class LifeForm:
             self.blue_color = random.randint(0, 255)
         self.time_to_live = random.randint(0, self.max_attribute)
         self.time_to_live_count = self.time_to_live
+        self.compatibility_factor = random.randint(0, self.max_attribute)
 
         self.direction = random.choice(current_session.directions)
         self.preferred_direction = self.direction
@@ -201,9 +188,6 @@ class LifeForm:
         self.matrix_position_y = start_y
 
         self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
-
-        # get current surrounding co-ords of the life form
-        self.surrounding_positions()
 
         self.lifeforms.update({self.life_form_id: self})
 
@@ -446,72 +430,24 @@ class LifeForm:
         pass
 
     def movement(self):
-        """
-        Will move the entity in its currently set direction (with 8 possible directions), if it hits the
-        edge of the board it will then assign a new random direction to go in, this function also handles the time to
-        move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
-        the edge of the board or another entity.
-        """
+        if args.gravity and (self.strength < self.weight or self.direction == 'still'):
+            self.direction = 'move_down'
 
-        # if entity is dead then skip and return
-        if not self.alive:
-            return "Dead"
-        # todo: make the gravity system a lot better and work off of calculations of weight strength etc.
-        if self.strength < self.weight:
-            self.direction = 'still'
-        elif self.strength > self.weight and self.direction == 'still':
-            self.randomise_direction()
+            logger.debug(f"Moved from gravity")
 
         collision_check = self.collision_factory()
-
-        # self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
 
         if collision_check == "Died":
             return collision_check
         elif not collision_check:
-            # todo: tidy up the movement system for less repeated code, so the collision checks are done within the
-            #  movement functions
             current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
             getattr(self, self.direction)()
-
-            self.surrounding_positions()
 
             # write new position in the buffer
             current_session.world_space_access.write_to_world_space(
                 (self.matrix_position_x, self.matrix_position_y),
                 (self.red_color, self.green_color,
                  self.blue_color), self.life_form_id)
-
-            if args.gravity and (self.strength < self.weight or self.direction == 'still'):
-
-                self.prev_matrix_position = (self.matrix_position_x, self.matrix_position_y)
-                pre_grav_direction = self.direction
-                self.direction = 'move_down'
-
-                # if entity is dead then skip and return
-                if not self.alive:
-                    return "Dead"
-
-                collision_check = self.collision_factory()
-
-                if collision_check == "Died":
-                    return collision_check
-                elif not collision_check:
-                    current_session.world_space_access.del_world_space_item(
-                        (self.matrix_position_x, self.matrix_position_y))
-                    moved = getattr(self, self.direction)()
-                    if moved:
-                        self.surrounding_positions()
-                        # current_session.world_space_access.del_world_space_item(self.prev_matrix_position)
-                        # write new position in the buffer
-                        current_session.world_space_access.write_to_world_space(
-                            (self.matrix_position_x, self.matrix_position_y),
-                            (self.red_color, self.green_color,
-                             self.blue_color), self.life_form_id)
-
-                self.direction = pre_grav_direction
-
-                logger.debug(f"Moved from gravity")
 
             # minus 1 from the time to move count until it hits 0, at which point the entity will change
             # direction from the "randomise direction" function being called
@@ -530,6 +466,38 @@ class LifeForm:
                 except KeyError:
                     self.linked_up = False
                     self.randomise_direction()
+
+    def process(self):
+        """
+        Will move the entity in its currently set direction (with 8 possible directions), if it hits the
+        edge of the board it will then assign a new random direction to go in, this function also handles the time to
+        move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
+        the edge of the board or another entity.
+        """
+
+        try:
+            expired = self.expire_entity()
+            if expired:
+                self.entity_remove()
+                return
+        except KeyError:
+            logger.debug(f"Missing entity: {self.life_form_id}")
+            return
+
+        current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
+        # if the current number of active life forms is higher than the previous record of concurrent
+        # life forms, update the concurrent life forms variable
+        if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
+            current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
+
+        # if entity is dead then skip and return
+        if not self.alive:
+            return "Dead"
+        # todo: make the gravity system a lot better and work off of calculations of weight strength etc.
+        if self.strength < self.weight:
+            self.direction = 'still'
+
+        self.movement()
 
     def randomise_direction(self):
         """
@@ -590,51 +558,35 @@ class LifeForm:
             ScreenController.screen.show()
         self.life_form_id.entity_remove()
 
-    def surrounding_positions(self):
-        """
-        Creates a list of all x, y points around the entity
-        """
-
-        self.positions_around_life_form = find_adjacent_positions(current_session.coord_map, (self.matrix_position_x,
-                                                                                              self.matrix_position_y))
-
     def board_position_generator(self):
         """
         Get board positions for new entities, allows for collision detection, either choosing from across the whole
         board or in the immediate area around a life form (determined by the life_form_id variable passed in).
         """
         # check area around entity for other life forms
-        if args.spawn_collision_detection:
-            getattr(self, self.preferred_breed_direction)()
+        getattr(self, self.preferred_breed_direction)()
 
-            preferred_spawn_point = self.adj_position
+        preferred_spawn_point = self.adj_position
 
-            data = current_session.world_space_access.get_from_world_space(preferred_spawn_point)
+        data = current_session.world_space_access.get_from_world_space(preferred_spawn_point)
 
-            if not data:
-                chosen_free_coord = preferred_spawn_point
-            else:
-                collision_map = list(self.adj_position)
-
-                while data:
-                    try:
-                        chosen_free_coord = collision_map.pop(random.randrange(len(collision_map)))
-                        data = current_session.world_space_access.get_from_world_space(chosen_free_coord)
-                    except IndexError:
-                        # if no free space is found return None
-                        return None
-                    except ValueError:
-                        # if no free space is found return None
-                        return None
-
-            logger.debug(f"Free space around the entity found: {chosen_free_coord}")
-            # if no other entity is in this location return the co-ords
-            return chosen_free_coord[0], chosen_free_coord[1]
+        if not data:
+            chosen_free_coord_x, chosen_free_coord_y = preferred_spawn_point
         else:
-            # with no collision detection enabled just choose a random spot
-            positions = random.choice(self.positions_around_life_form)
+            collision_map = list(self.adj_position)
 
-            return positions[0], positions[1]
+            while data:
+                try:
+                    chosen_free_coord_x, chosen_free_coord_y = collision_map.pop(random.randrange(len(collision_map)))
+                    data = current_session.world_space_access.get_from_world_space((chosen_free_coord_x,
+                                                                                    chosen_free_coord_y))
+                except IndexError:
+                    # if no free space is found return None
+                    return None
+
+        # logger.debug(f"Free space around the entity found: {chosen_free_coord}")
+        # if no other entity is in this location return the co-ords
+        return chosen_free_coord_x, chosen_free_coord_y
 
     def collision_detector(self):
         """
@@ -678,40 +630,30 @@ class LifeForm:
 
     def combine_entities(self, life_form_2):
         """
-        If the aggression factor of both entities is within the combine_threshold range they will reach a stalemate and
+        If the strength factor of both entities is within the combine_threshold range they will reach a stalemate and
         simply bounce off each other, unless combining is enabled - where they will combine to make a bigger life form.
         """
-        if self.aggression_factor + self.combine_threshold > \
-                LifeForm.lifeforms[life_form_2].aggression_factor > self.aggression_factor - self.combine_threshold:
+        if self.compatibility_factor + self.combine_threshold > \
+                LifeForm.lifeforms[life_form_2].compatibility_factor > self.compatibility_factor - self.combine_threshold:
             if args.combine_mode:
                 logger.debug(f'Entity: {self.life_form_id} combined with: {life_form_2}')
                 LifeForm.lifeforms[life_form_2].linked(life_form_id=self.life_form_id)
                 LifeForm.lifeforms[life_form_2].direction = self.direction
-            else:
-                logger.debug('Neither entity killed')
 
 
 def global_board_generator():
     # with collision detection determine if a spot on the board contains a life form
+    try:
+        random_free_coord = current_session.free_board_positions.pop()
 
-    if args.spawn_collision_detection:
-        try:
-            random_free_coord = current_session.free_board_positions.pop()
+    except IndexError:
 
-        except IndexError:
+        # if no free space is found return None
+        return None
 
-            # if no free space is found return None
-            return None
-
-        logger.debug(f"Free space around the entity found: {random_free_coord}")
-        # if no other entity is in this location return the co-ords
-        return random_free_coord[0], random_free_coord[1]
-    else:
-        # with no collision detection enabled just choose a random spot
-        post_x_gen = random.randint(0, ScreenController.u_width_max)
-        post_y_gen = random.randint(0, ScreenController.u_height_max)
-
-        return post_x_gen, post_y_gen
+    logger.debug(f"Free space around the entity found: {random_free_coord}")
+    # if no other entity is in this location return the co-ords
+    return random_free_coord[0], random_free_coord[1]
 
 
 def percentage(percent, whole):
@@ -782,64 +724,21 @@ def main():
         # for now this just checks whether the next frame time is ready or whether refresh logic is disabled
         # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
         # but the display will always be behind resulting in entities looking like they are teleporting around
+        life_form_container = LifeForm.lifeforms.copy().values()
         if time() > next_frame or not refresh_logic_link:
             # check the list of entities has items within
-            if LifeForm.lifeforms.values():
+            if life_form_container:
                 # for time the current set of life forms is processed increase the layer for minecraft to set blocks
                 # on by 1
-                current_session.current_layer += 1
+                # current_session.current_layer += 1
                 # for each life_form_id in the list use the life_form_id of the life form to work from
                 # replace with map()?
-                for life_form in LifeForm.lifeforms.copy().values():
-                    # call expiry function for current life form and update the list of life forms
-                    # todo: keep an eye on this, sometimes it will load an expired entity here despite not existing
-                    try:
-                        expired = life_form.expire_entity()
-                        if expired:
-                            life_form.entity_remove()
-                            continue
-                    except KeyError:
-                        logger.debug(f"Missing entity: {life_form.life_form_id}")
-                        continue
-
-                    current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
-                    # if the current number of active life forms is higher than the previous record of concurrent
-                    # life forms, update the concurrent life forms variable
-                    if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
-                        current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
-                    status_check = life_form.movement()
-
-                    # if life form is no longer alive, skip; due to the fact we copy the holder into a list to allow
-                    # the holder to be modified it may loop through dead entities until the while loop above the for
-                    # loop iterates again with the fresh holder
-                    if status_check == "Dead":
-                        continue
-                    elif status_check == "Died":
-                        life_form.entity_remove()
-                        continue
-
-                    life_form.get_stats()
-
-                    # run a check here to ensure that an expired entity is not being processed, unless it is the
-                    # last entity - as after expiry of the final entity it will still loop one last time and
-                    # iterate over that final entity one last time
-                    if life_form.life_form_id == current_session.last_removal:
-                        if len(LifeForm.lifeforms.values()) > 1:
-                            raise Exception(
-                                f"Entity {life_form.life_form_id} that expired this loop has been processed again")
-
-                    # some debug-like code to identify when a life form goes outside the LED board
-                    if life_form.matrix_position_x < 0 or \
-                            life_form.matrix_position_x > ScreenController.u_width_max:
-                        raise Exception("Life form has exceeded x axis")
-                    if life_form.matrix_position_y < 0 or \
-                            life_form.matrix_position_y > ScreenController.u_height_max:
-                        raise Exception("Life form has exceeded y axis")
+                [life_form.process() for life_form in life_form_container]
 
             # if the main list of entities is empty then all have expired; the program displays final information
             # about the programs run and exits; unless retry mode is active, then a new set of entities are created
             # and the simulation starts fresh with the same initial configuration
-            elif not LifeForm.lifeforms.values():
+            elif not life_form_container:
                 if first_run:
                     random.shuffle(current_session.free_board_positions)
                     [class_generator(i) for i in range(args.life_form_total)]
@@ -909,10 +808,6 @@ if __name__ == '__main__':
 
     parser.add_argument('-tr', '--trails', action="store_true", dest="trails_on",
                         help='Stops the HAT from being cleared, resulting in trails of entities')
-
-    parser.add_argument('-dcd', '--disable_collision_detection', action="store_false",
-                        dest="spawn_collision_detection",
-                        help='Whether entities can spawn over each other or not')
 
     parser.add_argument('-g', '--gravity', action="store_true", dest="gravity",
                         help='Gravity enabled, still entities will fall to the floor')
