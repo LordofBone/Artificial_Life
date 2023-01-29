@@ -572,7 +572,6 @@ class LifeForm:
                     except TypeError:
                         post_x_gen, post_y_gen = self.adj_position
 
-
                     else:
 
                         post_x_gen, post_y_gen = None, None
