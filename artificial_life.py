@@ -22,7 +22,7 @@ from pixel_composer.rasterizer import ScreenDrawer
 from threading import Thread
 
 from config.parameters import initial_lifeforms_count, population_limit, logging_level, initial_dna_chaos_chance, \
-    led_brightness, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number, \
+    led_brightness, hat_model, hat_simulator_or_panel_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number, \
     initial_radiation, max_radiation, change_of_base_radiation_chance
 
 logger = logging.getLogger("alife-logger")
@@ -781,7 +781,7 @@ if __name__ == '__main__':
                         help='Percentage chance of random DNA upon breeding of entities')
 
     parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", type=tuple,
-                        default=hat_simulator_size,
+                        default=hat_simulator_or_panel_size,
                         help='Maximum possible time to move number for entities')
 
     parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode",

@@ -21,7 +21,7 @@ class ScreenController:
     def __init__(self, screen_type, simulator, custom_size_simulator, led_brightness):
         if screen_type == "PANEL":
             # LED panel setup
-            self.screen = PanelController()
+            self.screen = PanelController(custom_size_simulator[0], custom_size_simulator[1])
         else:
             self.screen = UnicornHATController(screen_type, simulator, custom_size_simulator, led_brightness)
 

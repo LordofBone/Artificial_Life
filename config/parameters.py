@@ -8,6 +8,6 @@ max_radiation = 90
 change_of_base_radiation_chance = 0.001
 led_brightness = 0.3
 hat_model = "HD"
-hat_simulator_size = 64, 64
+hat_simulator_or_panel_size = 64, 64
 hat_buffer_refresh_rate = 60
 refresh_logic_link = True
