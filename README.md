@@ -59,7 +59,8 @@ sudo env PATH="$PATH" python artificial_life.py
 Arguments that can be passed: 
 
 ```
-  -m, --max-num         Maximum number possible for any entity traits
+  -m MAX_NUM, --max-num MAX_NUM
+                        Maximum number possible for any entity traits
   -ilc LIFE_FORM_TOTAL, --initial-lifeforms-count LIFE_FORM_TOTAL
                         Number of lifeforms to start with
   -s LOOP_SPEED, --refresh-rate LOOP_SPEED
@@ -69,7 +70,7 @@ Arguments that can be passed:
                         behind the logic loop)
   -p POP_LIMIT, --population-limit POP_LIMIT
                         Limit of the population at any one time
-  -dc DNA_CHAOS, --dna-chaos DNA_CHAOS
+  -dc DNA_CHAOS_CHANCE, --dna-chaos DNA_CHAOS_CHANCE
                         Percentage chance of random DNA upon breeding of
                         entities
   -shs CUSTOM_SIZE_SIMULATOR, --simulator-hat-size CUSTOM_SIZE_SIMULATOR
@@ -79,16 +80,28 @@ Arguments that can be passed:
                         Enables Minecraft mode
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
                         of entities
-  -dcd, --disable_collision_detection
-                        Whether entities can spawn over each other or not
   -g, --gravity         Gravity enabled, still entities will fall to the floor
+  -rc, --radiation-change
+                        Whether to adjust radiation levels across the
+                        simulation or not
+  -r RADIATION, --radiation RADIATION
+                        Radiation enabled, will increase random mutation
+                        chance and damage entities
+  -mr MAX_RADIATION, --max-radiation MAX_RADIATION
+                        Maximum radiation level possible
+  -rbc RADIATION_BASE_CHANGE_CHANCE, --radiation-base-change RADIATION_BASE_CHANGE_CHANCE
+                        The percentage chance that the base radiation level
+                        will change randomly.
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
   -sim, --unicorn-hat-sim
                         Whether to use the Unicorn HAT simulator or not
-  -hm {SD,HD,MINI,CUSTOM}, --hat-model {SD,HD,MINI,CUSTOM}
+  -hm {SD,HD,MINI,PANEL,CUSTOM}, --hat-model {SD,HD,MINI,PANEL,CUSTOM}
                         What type of HAT the program is using. CUSTOM only
                         works with Unicorn HAT Simulator
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
+  -ff, --fixed-function
+                        Whether to bypass pixel composer and use fixed
+                        function for drawing (faster, less pretty)
 ```
