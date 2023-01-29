@@ -23,7 +23,7 @@ from threading import Thread
 
 from config.parameters import initial_lifeforms_count, population_limit, logging_level, initial_dna_chaos_chance, \
     led_brightness, hat_model, hat_simulator_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number, \
-    initial_radiation, change_of_base_radiation_chance
+    initial_radiation, max_radiation, change_of_base_radiation_chance
 
 logger = logging.getLogger("alife-logger")
 
@@ -43,6 +43,7 @@ class Session:
     radiation_base_change_chance: float
     dna_chaos_chance: int
     max_attribute: int
+    radiation_max: int
     coord_map: tuple = ()
     last_removal: int = -1
     current_layer: int = 0
@@ -76,8 +77,10 @@ class Session:
         else:
             self.base_radiation = floor(101 * random.random())
 
-        self.radiation = int(self.base_radiation * random.uniform(min([y for x, y in self.radiation_curve]),
-                                                                  max([y for x, y in self.radiation_curve])))
+        self.radiation = max(
+            min(self.radiation_max, int(self.base_radiation * random.uniform(min([y for x, y in self.radiation_curve]),
+                                                                             max([y for x, y in
+                                                                                  self.radiation_curve])))), 0)
 
     class WorldSpaceControl:
         def __init__(self):
@@ -151,7 +154,7 @@ class LifeForm:
         self.life_seed2 = seed2
         self.life_seed3 = seed3
 
-        self.max_attribute = current_session.max_attribute
+        self.max_attribute = current_session.max_attribute + max_attrib_expand
 
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
@@ -257,7 +260,7 @@ class LifeForm:
 
         try:
             if self.time_to_live_count > 0:
-                self.time_to_live_count -= (1 + current_session.radiation)
+                self.time_to_live_count -= (1 + percentage(current_session.radiation, self.time_to_live_count))
                 expired = False
             elif self.time_to_live_count <= 0:
                 expired = True
@@ -800,6 +803,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--radiation', action="store", dest="radiation", type=int, default=initial_radiation,
                         help='Radiation enabled, will increase random mutation chance and damage entities')
 
+    parser.add_argument('-mr', '--max-radiation', action="store", dest="max_radiation", type=int, default=max_radiation,
+                        help='Maximum radiation level possible')
+
     parser.add_argument('-rbc', '--radiation-base-change', action="store", dest="radiation_base_change_chance",
                         type=float,
                         default=change_of_base_radiation_chance,
@@ -840,6 +846,7 @@ if __name__ == '__main__':
                               retries=args.retry_on,
                               highest_concurrent_lifeforms=args.life_form_total,
                               radiation=args.radiation,
+                              radiation_max=args.max_radiation,
                               dna_chaos_chance=args.dna_chaos_chance,
                               radiation_change=args.radiation_change,
                               radiation_base_change_chance=args.radiation_base_change_chance,
