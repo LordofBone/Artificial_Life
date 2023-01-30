@@ -23,7 +23,7 @@ from threading import Thread
 
 from config.parameters import initial_lifeforms_count, population_limit, logging_level, initial_dna_chaos_chance, \
     led_brightness, hat_model, hat_simulator_or_panel_size, hat_buffer_refresh_rate, refresh_logic_link, max_trait_number, \
-    initial_radiation, max_radiation, change_of_base_radiation_chance
+    initial_radiation, max_radiation, change_of_base_radiation_chance, radiation_dmg_multiplier
 
 logger = logging.getLogger("alife-logger")
 
@@ -108,6 +108,9 @@ class Session:
             except KeyError:
                 pass
 
+        def erase_world_space(self):
+            self.world_space = {"end": "ended"}
+
     world_space_access = WorldSpaceControl()
 
 
@@ -176,7 +179,7 @@ class LifeForm:
         else:
             self.green_color = floor(256 * random.random())
         self.aggression_factor = floor(self.max_attribute * random.random())
-        self.time_to_move = floor(self.max_attribute * random.random())
+        self.time_to_move = floor(100 * random.random())
         self.time_to_move_count = self.time_to_move
         self.weight = floor(self.max_attribute * random.random())
 
@@ -260,7 +263,7 @@ class LifeForm:
 
         try:
             if self.time_to_live_count > 0:
-                self.time_to_live_count -= (1 + percentage(current_session.radiation, self.time_to_live_count))
+                self.time_to_live_count -= percentage(current_session.radiation*args.radiation_dmg_multi, 1)
                 expired = False
             elif self.time_to_live_count <= 0:
                 expired = True
@@ -746,7 +749,8 @@ def main():
                         f'\n All Lifeforms have expired.\n Total life forms produced: '
                         f'{current_session.life_form_total_count}\n '
                         f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
-                    break
+                    current_session.world_space_access.erase_world_space()
+                    quit()
 
             logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
 
@@ -803,6 +807,10 @@ if __name__ == '__main__':
                         help='Radiation enabled, will increase random mutation chance and damage entities')
 
     parser.add_argument('-mr', '--max-radiation', action="store", dest="max_radiation", type=int, default=max_radiation,
+                        help='Maximum radiation level possible')
+
+    parser.add_argument('-rm', '--radiation-multi', action="store", dest="radiation_dmg_multi", type=int,
+                        default=radiation_dmg_multiplier,
                         help='Maximum radiation level possible')
 
     parser.add_argument('-rbc', '--radiation-base-change', action="store", dest="radiation_base_change_chance",
