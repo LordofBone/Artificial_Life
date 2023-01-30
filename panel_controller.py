@@ -2,7 +2,7 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 
 class PanelSetup(object):
-    def __init__(self, panel_x, panel_y):
+    def __init__(self, panel_x, panel_y, led_brightness):
         self.options = RGBMatrixOptions()
         self.options.rows = panel_y
         self.options.cols = panel_x
@@ -11,7 +11,7 @@ class PanelSetup(object):
         self.options.row_address_type = 0
         self.options.multiplexing = 0
         self.options.pwm_bits = 11
-        self.options.brightness = 100
+        self.options.brightness = int(led_brightness*100)
         self.options.pwm_lsb_nanoseconds = 130
         self.options.led_rgb_sequence = "RGB"
         self.options.pixel_mapper_config = ""
@@ -25,8 +25,8 @@ class PanelSetup(object):
 
 
 class PanelController(PanelSetup):
-    def __init__(self, panel_x, panel_y):
-        super(PanelController, self).__init__(panel_x, panel_y)
+    def __init__(self, panel_x, panel_y, led_brightness):
+        super(PanelController, self).__init__(panel_x, panel_y, led_brightness)
         self.offset_canvas = self.matrix.CreateFrameCanvas()
 
     def set_pixel(self, x, y, r, g, b):
