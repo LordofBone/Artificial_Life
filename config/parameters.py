@@ -6,6 +6,7 @@ initial_dna_chaos_chance = 10
 initial_radiation = 0
 max_radiation = 90
 change_of_base_radiation_chance = 0.001
+radiation_dmg_multiplier = 1000
 led_brightness = 0.3
 hat_model = "HD"
 hat_simulator_or_panel_size = 64, 64
