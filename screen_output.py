@@ -39,7 +39,11 @@ class ScreenController:
         try:
             self.screen.set_pixel(pixel_coord[0], pixel_coord[1], pixel_rgb[0], pixel_rgb[1], pixel_rgb[2])
         except IndexError:
-            raise Exception(f"Set pixel did not like pixel coordinate: {pixel_coord} with RGB value: {pixel_rgb}")
+            if pixel_rgb == "e":
+                logger.info("Render thread purposely ended")
+                quit()
+            else:
+                raise Exception(f"Set pixel did not like pixel coordinate: {pixel_coord} with RGB value: {pixel_rgb}")
         # todo: improve this greatly and move it out of this class/module
         # if args.mc_mode:
         #     player_x, player_y, player_z = mc.player.getPos()
