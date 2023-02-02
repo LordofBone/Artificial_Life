@@ -11,6 +11,8 @@ from time import time
 
 from screen_output import ScreenController
 
+from pynput import keyboard
+
 from collections import deque
 
 # from mcpi.minecraft import Minecraft
@@ -29,6 +31,14 @@ from config.parameters import initial_lifeforms_count, population_limit, logging
     initial_radiation, max_radiation, change_of_base_radiation_chance, radiation_dmg_multiplier, max_enemy_factor
 
 logger = logging.getLogger("alife-logger")
+
+# The key combination to check
+COMBINATIONS = [
+    {keyboard.KeyCode(char='T')}
+]
+
+# The currently active modifiers
+current = set()
 
 
 def diagonal_distance(x1, y1, x2, y2):
@@ -741,6 +751,14 @@ class FrameBufferInit(FrameBuffer):
         self.lighting.moving_light = False
 
 
+def on_press(key):
+
+    if any([key in COMBO for COMBO in COMBINATIONS]):
+        current.add(key)
+        if any(all(k in current for k in COMBO) for COMBO in COMBINATIONS):
+            thanos_snap()
+
+
 def global_board_generator():
     # with collision detection determine if a spot on the board contains a life form
     try:
@@ -779,8 +797,12 @@ def thanos_snap():
     # loop for 50% of all existing entities choosing at random to eliminate
     for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
         vanished = random.choice((list(LifeForm.lifeforms.values())))
+
         # fade them away
-        LifeForm.lifeforms[vanished].fade_entity()
+        try:
+            LifeForm.lifeforms[vanished.life_form_id].entity_remove()
+        except KeyError:
+            pass
     logger.info("Perfectly balanced as all things should be")
 
 
@@ -965,6 +987,9 @@ if __name__ == '__main__':
                               radiation_change=args.radiation_change,
                               radiation_base_change_chance=args.radiation_base_change_chance,
                               max_attribute=args.max_num)
+
+    listener = keyboard.Listener(on_press=on_press, daemon=True)
+    listener.start()
 
     Thread(target=main, daemon=True).start()
 

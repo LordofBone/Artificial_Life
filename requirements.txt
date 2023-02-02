@@ -1,6 +1,7 @@
 mcpi==1.2.1
 pygame==2.1.2
 unicorn-hat-sim==1.0.0
+pynput~=1.7.6
 unicornhat
 unicornhatmini
 unicornhathd
