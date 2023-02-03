@@ -11,7 +11,7 @@ from time import time
 
 from screen_output import ScreenController
 
-from pynput import keyboard
+from pynput.keyboard import KeyCode, Listener
 
 from collections import deque
 
@@ -31,14 +31,6 @@ from config.parameters import initial_lifeforms_count, population_limit, logging
     initial_radiation, max_radiation, change_of_base_radiation_chance, radiation_dmg_multiplier, max_enemy_factor
 
 logger = logging.getLogger("alife-logger")
-
-# The key combination to check
-COMBINATIONS = [
-    {keyboard.KeyCode(char='T')}
-]
-
-# The currently active modifiers
-current = set()
 
 
 def diagonal_distance(x1, y1, x2, y2):
@@ -64,6 +56,7 @@ class Session:
     dna_chaos_chance: int
     max_attribute: int
     radiation_max: int
+    gravity_on: bool
     max_movement: int = 0
     coord_map: tuple = ()
     last_removal: int = -1
@@ -540,7 +533,7 @@ class LifeForm:
 
             if self.direction == 'move_down':
                 self.matrix_position_y += 1
-                if args.gravity:
+                if current_session.gravity_on:
                     self.momentum += 1
                 else:
                     self.momentum -= 2
@@ -566,7 +559,7 @@ class LifeForm:
             if self.direction == 'move_down_and_right':
                 self.matrix_position_y += 1
                 self.matrix_position_x += 1
-                if args.gravity:
+                if current_session.gravity_on:
                     self.momentum += 1
                 else:
                     self.momentum -= 2
@@ -574,7 +567,7 @@ class LifeForm:
             if self.direction == 'move_down_and_left':
                 self.matrix_position_y += 1
                 self.matrix_position_x -= 1
-                if args.gravity:
+                if current_session.gravity_on:
                     self.momentum += 1
                 else:
                     self.momentum -= 2
@@ -696,8 +689,8 @@ class LifeForm:
         if self.strength < self.weight:
             self.direction = 'still'
 
-        if args.gravity and (self.strength < self.weight or self.direction == 'still'
-                             or self.momentum <= 0):
+        if current_session.gravity_on and (self.strength < self.weight or self.direction == 'still'
+                                           or self.momentum <= 0):
             self.direction = 'move_down'
             logger.debug(f"Moved from gravity")
 
@@ -794,10 +787,10 @@ class FrameBufferInit(FrameBuffer):
 
 
 def on_press(key):
-    if any([key in COMBO for COMBO in COMBINATIONS]):
-        current.add(key)
-        if any(all(k in current for k in COMBO) for COMBO in COMBINATIONS):
-            thanos_snap()
+    if key == KeyCode(char='T'):
+        thanos_snap()
+    if key == KeyCode(char='G'):
+        gravity_switch()
 
 
 def global_board_generator():
@@ -844,6 +837,10 @@ def thanos_snap():
         except KeyError:
             pass
     logger.info("Perfectly balanced as all things should be")
+
+
+def gravity_switch():
+    current_session.gravity_on = not current_session.gravity_on
 
 
 def class_generator(life_form_id):
@@ -1026,9 +1023,10 @@ if __name__ == '__main__':
                               dna_chaos_chance=args.dna_chaos_chance,
                               radiation_change=args.radiation_change,
                               radiation_base_change_chance=args.radiation_base_change_chance,
-                              max_attribute=args.max_num)
+                              max_attribute=args.max_num,
+                              gravity_on=args.gravity)
 
-    listener = keyboard.Listener(on_press=on_press, daemon=True)
+    listener = Listener(on_press=on_press, daemon=True)
     listener.start()
 
     Thread(target=main, daemon=True).start()
