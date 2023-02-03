@@ -120,28 +120,53 @@ class Session:
 
             self.world_space = {}
 
+            self.world_space_2 = {}
+
             self.buffer_ready = False
 
-        def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id):
-            self.world_space[pixel_coord] = pixel_rgb, entity_id
+        def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_selector=1):
+            if world_space_selector == 1:
+                self.world_space[pixel_coord] = pixel_rgb, entity_id
+            elif world_space_selector == 2:
+                self.world_space_2[pixel_coord] = pixel_rgb, entity_id
 
-        def return_world_space(self):
-            return {key: value[0] for key, value in self.world_space.copy().items()}
+        def return_world_space(self, world_space_selector=1):
+            if world_space_selector == 1:
+                return {key: value[0] for key, value in self.world_space.copy().items()}
+            elif world_space_selector == 2:
+                world_space_2_return = {key: value[0] for key, value in self.world_space_2.copy().items()}
+                self.world_space_2 = {}
+                return world_space_2_return
 
-        def get_from_world_space(self, pixel_coord):
-            try:
-                return self.world_space[pixel_coord]
-            except KeyError:
-                return None
+        def get_from_world_space(self, pixel_coord, world_space_selector=1):
+            if world_space_selector == 1:
+                try:
+                    return self.world_space[pixel_coord]
+                except KeyError:
+                    return None
+            elif world_space_selector == 2:
+                try:
+                    return self.world_space_2[pixel_coord]
+                except KeyError:
+                    return None
 
-        def del_world_space_item(self, coord):
-            try:
-                del self.world_space[coord]
-            except KeyError:
-                pass
+        def del_world_space_item(self, coord, world_space_selector=1):
+            if world_space_selector == 1:
+                try:
+                    del self.world_space[coord]
+                except KeyError:
+                    pass
+            elif world_space_selector == 2:
+                try:
+                    del self.world_space_2[coord]
+                except KeyError:
+                    pass
 
-        def erase_world_space(self):
-            self.world_space = {"end": "ended"}
+        def erase_world_space(self, world_space_selector=1):
+            if world_space_selector == 1:
+                self.world_space = {"end": "ended"}
+            elif world_space_selector == 2:
+                self.world_space_2 = {"end": "ended"}
 
     world_space_access = WorldSpaceControl()
 
@@ -401,7 +426,11 @@ class LifeForm:
                 self.direction = random.choice(current_session.directions)
 
             if collided_life_form_id:
-                LifeForm.lifeforms[collided_life_form_id].momentum += momentum_reduction
+                # todo: apply this to the whole loop to prevent weird things when thanos snap happens
+                try:
+                    LifeForm.lifeforms[collided_life_form_id].momentum += momentum_reduction
+                except KeyError:
+                    pass
 
                 # if the aggression factor is below the entities breed threshold the life form will attempt to
                 # breed with the one it collided with
@@ -689,19 +718,11 @@ class LifeForm:
         """
         Erases an entity from the board by fading it away.
         """
-        # todo: make a shader for this instead
-        for c in range(0, 255):
-            if self.red_color > 0:
-                self.red_color -= 1
-            if self.green_color > 0:
-                self.green_color -= 1
-            if self.blue_color > 0:
-                self.blue_color -= 1
-            ScreenController.screen.set_pixel(self.matrix_position_x, self.matrix_position_y, self.red_color,
-                                              self.green_color,
-                                              self.blue_color)
-            ScreenController.screen.show()
-        self.life_form_id.entity_remove()
+        current_session.world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id, 2)
+        self.entity_remove()
 
 
 class DrawObjects(ScreenDrawer):
@@ -714,15 +735,30 @@ class DrawObjects(ScreenDrawer):
 
         self.frame_buffer_access = FrameBufferInit(self.session_info)
 
-        self.render_stack = ['background_shader_pass',
-                             'object_colour_pass',
-                             'tone_map_pass',
-                             'render_frame_buffer',
-                             'float_to_rgb_pass',
-                             'buffer_scan',
-                             'flush_buffer']
+        self.render_stack = [
+            'object_colour_pass',
+            'removed_object_colour_pass',
+            'log_current_frame',
+            'fade_entity_pass',
+            'tone_map_pass',
+            'render_frame_buffer',
+            'float_to_rgb_pass',
+            'buffer_scan',
+            'flush_buffer']
 
         self.draw()
+
+    def fade_entity_pass(self):
+        # todo: convert this to list comprehension? and tidy it up
+        for coord, pixel in self.frame_buffer_access.removed_entity_buffer.items():
+            new_pixel = self.frame_buffer_access.motion_blur.run_shader(pixel)
+            if new_pixel:
+                self.frame_buffer_access.write_to_render_plane(coord, new_pixel)
+                self.frame_buffer_access.write_to_removed_entity_buffer(coord, new_pixel)
+
+    def removed_object_colour_pass(self):
+        [self.frame_buffer_access.write_to_removed_entity_buffer(coord, pixel) for coord, pixel in
+         self.world_space_access.return_world_space(2).items()]
 
 
 class FrameBufferInit(FrameBuffer):
@@ -731,6 +767,8 @@ class FrameBufferInit(FrameBuffer):
         super().__init__(session_info=session_info)
 
         self.blank_pixel = (0.0, 0.0, 0.0)
+
+        self.removed_entity_buffer = {}
 
         # WARNING: be careful with these, it can cause flashing images
         # self.shader_stack.multi_shader_creator(input_shader=FullScreenPatternShader, number_of_shaders=2, base_number=4,
@@ -744,15 +782,18 @@ class FrameBufferInit(FrameBuffer):
         #     FullScreenPatternShader(count_number_max=7, shader_colour=(0.0, 1.0, 0.0)))
 
         self.motion_blur.shader_colour = (0.0, 0.0, 0.0)
-        self.motion_blur.static_shader_alpha = 0.9
+        self.motion_blur.static_shader_alpha = 0.3
+        self.motion_blur.float_clip_min = 0.001
 
         self.lighting.shader_colour = (1.0, 1.0, 1.0)
         self.lighting.light_strength = 10.0
         self.lighting.moving_light = False
 
+    def write_to_removed_entity_buffer(self, pixel_coord, pixel_rgb):
+        self.removed_entity_buffer[pixel_coord] = pixel_rgb
+
 
 def on_press(key):
-
     if any([key in COMBO for COMBO in COMBINATIONS]):
         current.add(key)
         if any(all(k in current for k in COMBO) for COMBO in COMBINATIONS):
@@ -793,14 +834,13 @@ def thanos_snap():
     """
     Randomly kill half of the entities in existence on the board
     """
-    # todo: reconfigure all this to use the new rasterizer
     # loop for 50% of all existing entities choosing at random to eliminate
     for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
         vanished = random.choice((list(LifeForm.lifeforms.values())))
 
         # fade them away
         try:
-            LifeForm.lifeforms[vanished.life_form_id].entity_remove()
+            LifeForm.lifeforms[vanished.life_form_id].fade_entity()
         except KeyError:
             pass
     logger.info("Perfectly balanced as all things should be")
