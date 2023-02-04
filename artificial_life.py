@@ -57,10 +57,10 @@ class Session:
     max_attribute: int
     radiation_max: int
     gravity_on: bool
+    rendering_on: bool = False
     max_movement: int = 0
     coord_map: tuple = ()
     last_removal: int = -1
-    current_layer: int = 0
     current_life_form_amount: int = 0
     life_form_total_count: int = 0
 
@@ -74,7 +74,7 @@ class Session:
 
     def __post_init__(self):
         self.coord_map = tuple(
-            (x, y) for x in range(ScreenController.u_width) for y in range(ScreenController.u_height))
+            (x, y) for x in range(screen_controller.u_width) for y in range(screen_controller.u_height))
 
         self.get_coord_map()
 
@@ -791,6 +791,8 @@ def on_press(key):
         thanos_snap()
     if key == KeyCode(char='G'):
         gravity_switch()
+    if key == KeyCode(char='F'):
+        render_switch()
 
 
 def global_board_generator():
@@ -843,6 +845,10 @@ def gravity_switch():
     current_session.gravity_on = not current_session.gravity_on
 
 
+def render_switch():
+    current_session.rendering_on = not current_session.rendering_on
+
+
 def class_generator(life_form_id):
     """
     Assign all the life_form_ids into class instances for each life form for each life_form_id in the list of all
@@ -864,8 +870,7 @@ def main():
     Main loop where all life form movement and interaction takes place
     """
     # wrap main loop into a try/catch to allow keyboard exit and cleanup
-    first_run = True
-    current_session.max_movement = diagonal_distance(0, 0, ScreenController.u_width, ScreenController.u_height)
+    current_session.max_movement = diagonal_distance(0, 0, screen_controller.u_width, screen_controller.u_height)
     next_frame = time() + frame_refresh_delay_ms
     while True:
         # todo: add in a check to see if the buffer is ready to be written to before writing to it, will need to
@@ -880,29 +885,24 @@ def main():
             if life_form_container:
                 # for time the current set of life forms is processed increase the layer for minecraft to set blocks
                 # on by 1
-                # current_session.current_layer += 1
                 # for each life_form_id in the list use the life_form_id of the life form to work from
-                # replace with map()?
                 [life_form.process() for life_form in life_form_container]
 
             # if the main list of entities is empty then all have expired; the program displays final information
             # about the programs run and exits; unless retry mode is active, then a new set of entities are created
             # and the simulation starts fresh with the same initial configuration
+
             elif not life_form_container:
-                if first_run:
-                    [class_generator(i) for i in range(args.life_form_total)]
+                if current_session.retries:
+                    current_session.rendering_on = False
 
-                    first_run = False
-
-                    continue
-
-                elif current_session.retries:
                     current_session.highest_concurrent_lifeforms = 0
-                    current_session.current_layer = 0
                     current_session.last_removal = -1
                     current_session.get_coord_map()
 
                     [class_generator(i) for i in range(args.life_form_total)]
+
+                    current_session.rendering_on = True
 
                     continue
                 else:
@@ -1005,8 +1005,9 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    ScreenController = ScreenController(screen_type=args.hat_edition, simulator=args.simulator,
-                                        custom_size_simulator=args.custom_size_simulator, led_brightness=led_brightness)
+    screen_controller = ScreenController(screen_type=args.hat_edition, simulator=args.simulator,
+                                         custom_size_simulator=args.custom_size_simulator,
+                                         led_brightness=led_brightness)
 
     # setup Minecraft connection if mc_mode is True
     # if args.mc_mode:
@@ -1026,13 +1027,17 @@ if __name__ == '__main__':
                               max_attribute=args.max_num,
                               gravity_on=args.gravity)
 
+    [class_generator(i) for i in range(args.life_form_total)]
+
+    current_session.rendering_on = True
+
     listener = Listener(on_press=on_press, daemon=True)
     listener.start()
 
     Thread(target=main, daemon=True).start()
 
     if not args.fixed_function:
-        draw_control = DrawObjects(output_controller=ScreenController,
+        draw_control = DrawObjects(output_controller=screen_controller,
                                    buffer_refresh=hat_buffer_refresh_rate,
                                    session_info=current_session,
                                    exit_text='Program ended by user.\n Total life forms produced: ${'
@@ -1042,8 +1047,8 @@ if __name__ == '__main__':
                                              'Lifeforms: ${current_life_form_amount}')
     else:
         while True:
-            [ScreenController.draw_pixels(coord, (0, 0, 0)) for coord in
+            [screen_controller.draw_pixels(coord, (0, 0, 0)) for coord in
              current_session.coord_map]
-            [ScreenController.draw_pixels(coord, pixel[0]) for coord, pixel in
+            [screen_controller.draw_pixels(coord, pixel[0]) for coord, pixel in
              current_session.world_space_access.world_space.copy().items()]
-            ScreenController.show()
+            screen_controller.show()
