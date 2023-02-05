@@ -11,12 +11,14 @@ class UnicornHATController:
             import unicornhat as unicorn
             import unicornhathd as unicornhd
             from unicornhatmini import UnicornHATMini
-        except ImportError:
+            print("Unicorn HAT install found, using Unicorn HAT")
+        except ImportError or ModuleNotFoundError:
             try:
                 from unicorn_hat_sim import UnicornHatSim
                 from unicorn_hat_sim import unicornhat as unicorn
                 from unicorn_hat_sim import unicornhathd as unicornhd
                 from unicorn_hat_sim import unicornphat as UnicornHATMini
+                print("Unicorn HAT install not found, using Simulated Unicorn HAT")
             except ModuleNotFoundError:
                 pass
         except:
@@ -67,10 +69,27 @@ class UnicornHATController:
             self.simulator_refresh = True
 
     def get_shape(self):
+        """
+        Get the shape of the screen, for use in the simulator logic
+        :return:
+        """
         return self.screen.get_shape()
 
     def set_pixel(self, x, y, r, g, b):
+        """
+        Set a pixel on the screen
+        :param x:
+        :param y:
+        :param r:
+        :param g:
+        :param b:
+        :return:
+        """
         self.screen.set_pixel(x, y, r, g, b)
 
     def show(self):
+        """
+        Show the screen, nothing will be displayed until this is called
+        :return:
+        """
         self.screen.show()
