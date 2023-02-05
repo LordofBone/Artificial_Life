@@ -3,8 +3,9 @@ import itertools
 import logging
 import os
 import random
-from math import floor
-from math import sqrt
+import json
+from dataclasses import asdict
+from math import floor, sqrt
 import sys
 from dataclasses import dataclass
 from time import time
@@ -29,6 +30,11 @@ from config.parameters import initial_lifeforms_count, population_limit, logging
     initial_radiation, max_radiation, change_of_base_radiation_chance, radiation_dmg_multiplier, max_enemy_factor
 
 logger = logging.getLogger("alife-logger")
+
+
+def pretty_print_dataclass(dataclass_object):
+    """Prints a pretty formatted version of a dataclass object."""
+    return json.dumps(asdict(dataclass_object), indent=4)
 
 
 def diagonal_distance(x1, y1, x2, y2):
@@ -367,6 +373,8 @@ class LifeForm:
         """
         This method is used to process the life form, it will check if the life form is dead, if it is it will remove
         it, this also handles all movement and breeding as well as gravity and momentum adjustments
+        This is all wrapped within a try except block to catch any KeyErrors that may occur if the other life form the
+        current one has collided with has been removed
         :return:
         """
 
@@ -380,147 +388,188 @@ class LifeForm:
             if expired:
                 self.entity_remove()
                 return
-        except KeyError:
-            logger.debug(f"Missing entity: {self.life_form_id}")
-            return
 
-        current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
-        # if the current number of active life forms is higher than the previous record of concurrent
-        # life forms, update the concurrent life forms variable
-        if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
-            current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
+            current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
+            # if the current number of active life forms is higher than the previous record of concurrent
+            # life forms, update the concurrent life forms variable
+            if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
+                current_session.highest_concurrent_lifeforms = current_session.current_life_form_amount
 
-        # if entity is dead then skip and return
-        if not self.alive:
-            return "Dead"
+            # if entity is dead then skip and return
+            if not self.alive:
+                return "Dead"
 
-        if self.direction == 'move_right':
-            self.adj_position = self.matrix_position_x + 1, self.matrix_position_y
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_left':
-            self.adj_position = self.matrix_position_x - 1, self.matrix_position_y
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_down':
-            self.adj_position = self.matrix_position_x, self.matrix_position_y + 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_up':
-            self.adj_position = self.matrix_position_x, self.matrix_position_y - 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_down_and_right':
-            self.adj_position = self.matrix_position_x + 1, self.matrix_position_y + 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_up_and_left':
-            self.adj_position = self.matrix_position_x - 1, self.matrix_position_y - 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_down_and_left':
-            self.adj_position = self.matrix_position_x - 1, self.matrix_position_y + 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
-        elif self.direction == 'move_up_and_right':
-            self.adj_position = self.matrix_position_x + 1, self.matrix_position_y - 1
-            if self.adj_position not in current_session.coord_map:
-                self.adj_position = None
+            if self.direction == 'move_right':
+                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_left':
+                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_down':
+                self.adj_position = self.matrix_position_x, self.matrix_position_y + 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_up':
+                self.adj_position = self.matrix_position_x, self.matrix_position_y - 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_down_and_right':
+                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y + 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_up_and_left':
+                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y - 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_down_and_left':
+                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y + 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
+            elif self.direction == 'move_up_and_right':
+                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y - 1
+                if self.adj_position not in current_session.coord_map:
+                    self.adj_position = None
 
-        if not self.direction == 'still':
-            if not self.adj_position:
-                collision_detected = True
-                collided_life_form_id = None
-            else:
-
-                try:
-                    s_item_life_form_id = \
-                        current_session.world_space_access.get_from_world_space(self.adj_position)[1]
+            if not self.direction == 'still':
+                if not self.adj_position:
                     collision_detected = True
-                    collided_life_form_id = s_item_life_form_id
-                except TypeError:
-
-                    collision_detected = False
                     collided_life_form_id = None
-        else:
-
-            collision_detected = False
-            collided_life_form_id = None
-
-        if self.waiting_to_spawn:
-            preferred_direction = random.choice(current_session.surrounding_point_choices)
-
-        # get the count of total life forms currently active
-        # if there has been a collision with another entity it will attempt to interact with the other entity
-        if collision_detected:
-            if self.bouncy:
-                momentum_reduction = percentage(10, self.momentum)
-                self.momentum -= momentum_reduction
-            else:
-                momentum_reduction = percentage(60, self.momentum)
-                self.momentum -= momentum_reduction
-
-            logger.debug(f'Collision detected: {self.life_form_id} collided with {collided_life_form_id}')
-
-            # store the current direction for later use, like if the life form kills another, it will continue moving
-            # in that direction rather than bounce
-            self.previous_direction = self.direction
-
-            if not self.direction == self.preferred_direction:
-                self.direction = self.preferred_direction
-            else:
-                self.direction = random.choice(current_session.directions)
-
-            if collided_life_form_id:
-                # todo: apply this to the whole loop to prevent weird things when thanos snap happens
-                try:
-                    LifeForm.lifeforms[collided_life_form_id].momentum += momentum_reduction
-                except KeyError:
-                    pass
-
-                # if the aggression factor is below the entities breed threshold the life form will attempt to
-                # breed with the one it collided with
-                if abs(self.aggression_factor - LifeForm.lifeforms[collided_life_form_id].aggression_factor) \
-                        <= self.breed_threshold:
-                    # the other entity also needs to have its aggression factor below its breed threshold
-
-                    if self.compatibility_factor + self.combine_threshold > \
-                            LifeForm.lifeforms[
-                                collided_life_form_id].compatibility_factor > self.compatibility_factor - self.combine_threshold:
-                        if args.combine_mode:
-                            logger.debug(f'Entity: {self.life_form_id} combined with: {collided_life_form_id}')
-
-                            LifeForm.lifeforms[collided_life_form_id].linked_up = True
-                            LifeForm.lifeforms[collided_life_form_id].linked_to = self.life_form_id
-
-                            LifeForm.lifeforms[collided_life_form_id].direction = self.direction
-
-                    if not self.waiting_to_spawn:
-                        if random.random() < .5:
-                            attrib_boost = self.max_attribute
-                        else:
-                            attrib_boost = LifeForm.lifeforms[collided_life_form_id].max_attribute
-
-                        preferred_direction = self.preferred_breed_direction
-                        self.waiting_seed1 = self.get_dna(1, collided_life_form_id)
-                        self.waiting_seed2 = self.get_dna(2, collided_life_form_id)
-                        self.waiting_seed3 = self.get_dna(3, collided_life_form_id)
-                        self.waiting_max_attrib_expand = attrib_boost
-                        self.waiting_to_spawn = True
-
                 else:
-                    if not LifeForm.lifeforms[collided_life_form_id].aggression_factor < \
-                           LifeForm.lifeforms[collided_life_form_id].breed_threshold:
 
-                        # if the other entities' aggression factor is lower it will be killed and removed from the
-                        # main loops list of entities
+                    try:
+                        s_item_life_form_id = \
+                            current_session.world_space_access.get_from_world_space(self.adj_position)[1]
+                        collision_detected = True
+                        collided_life_form_id = s_item_life_form_id
+                    except TypeError:
 
-                        if LifeForm.lifeforms[collided_life_form_id].strength < self.strength:
+                        collision_detected = False
+                        collided_life_form_id = None
+            else:
+
+                collision_detected = False
+                collided_life_form_id = None
+
+            if self.waiting_to_spawn:
+                preferred_direction = random.choice(current_session.surrounding_point_choices)
+
+            # get the count of total life forms currently active
+            # if there has been a collision with another entity it will attempt to interact with the other entity
+            if collision_detected:
+                if self.bouncy:
+                    momentum_reduction = percentage(10, self.momentum)
+                    self.momentum -= momentum_reduction
+                else:
+                    momentum_reduction = percentage(60, self.momentum)
+                    self.momentum -= momentum_reduction
+
+                logger.debug(f'Collision detected: {self.life_form_id} collided with {collided_life_form_id}')
+
+                # store the current direction for later use, like if the life form kills another, it will continue moving
+                # in that direction rather than bounce
+                self.previous_direction = self.direction
+
+                if not self.direction == self.preferred_direction:
+                    self.direction = self.preferred_direction
+                else:
+                    self.direction = random.choice(current_session.directions)
+
+                if collided_life_form_id:
+                    # todo: apply this to the whole loop to prevent weird things when thanos snap happens
+                    try:
+                        LifeForm.lifeforms[collided_life_form_id].momentum += momentum_reduction
+                    except KeyError:
+                        pass
+
+                    # if the aggression factor is below the entities breed threshold the life form will attempt to
+                    # breed with the one it collided with
+                    if abs(self.aggression_factor - LifeForm.lifeforms[collided_life_form_id].aggression_factor) \
+                            <= self.breed_threshold:
+                        # the other entity also needs to have its aggression factor below its breed threshold
+
+                        if self.compatibility_factor + self.combine_threshold > \
+                                LifeForm.lifeforms[
+                                    collided_life_form_id].compatibility_factor > self.compatibility_factor - self.combine_threshold:
+                            if args.combine_mode:
+                                logger.debug(f'Entity: {self.life_form_id} combined with: {collided_life_form_id}')
+
+                                LifeForm.lifeforms[collided_life_form_id].linked_up = True
+                                LifeForm.lifeforms[collided_life_form_id].linked_to = self.life_form_id
+
+                                LifeForm.lifeforms[collided_life_form_id].direction = self.direction
+
+                        if not self.waiting_to_spawn:
+                            if random.random() < .5:
+                                attrib_boost = self.max_attribute
+                            else:
+                                attrib_boost = LifeForm.lifeforms[collided_life_form_id].max_attribute
+
+                            preferred_direction = self.preferred_breed_direction
+                            self.waiting_seed1 = self.get_dna(1, collided_life_form_id)
+                            self.waiting_seed2 = self.get_dna(2, collided_life_form_id)
+                            self.waiting_seed3 = self.get_dna(3, collided_life_form_id)
+                            self.waiting_max_attrib_expand = attrib_boost
+                            self.waiting_to_spawn = True
+
+                    else:
+                        if not LifeForm.lifeforms[collided_life_form_id].aggression_factor < \
+                               LifeForm.lifeforms[collided_life_form_id].breed_threshold:
+
+                            # if the other entities' aggression factor is lower it will be killed and removed from the
+                            # main loops list of entities
+
+                            if LifeForm.lifeforms[collided_life_form_id].strength < self.strength:
+                                logger.debug('Other entity killed')
+
+                                self.time_to_live_count += LifeForm.lifeforms[collided_life_form_id].time_to_live_count
+                                self.weight += LifeForm.lifeforms[collided_life_form_id].weight
+                                self.strength += LifeForm.lifeforms[collided_life_form_id].strength
+
+                                LifeForm.lifeforms[collided_life_form_id].entity_remove()
+
+                                self.direction = self.previous_direction
+
+                                collision_check = True
+
+                            # if the other entities' aggression factor is higher it will be killed the current entity
+                            # it will be removed from the main loops list of entities
+                            elif LifeForm.lifeforms[collided_life_form_id].strength > self.strength:
+                                logger.debug('Current entity killed')
+
+                                LifeForm.lifeforms[collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                LifeForm.lifeforms[collided_life_form_id].weight += self.weight
+                                LifeForm.lifeforms[collided_life_form_id].strength += self.strength
+
+                                collision_check = "Died"
+
+                            elif LifeForm.lifeforms[collided_life_form_id].strength == self.strength:
+                                logger.debug('Entities matched, flipping coin')
+
+                                if random.random() < .5:
+                                    logger.debug('Current entity killed')
+                                    LifeForm.lifeforms[
+                                        collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                    LifeForm.lifeforms[collided_life_form_id].weight += self.weight
+                                    LifeForm.lifeforms[collided_life_form_id].strength += self.strength
+
+                                    collision_check = "Died"
+
+                                else:
+                                    logger.debug('Other entity killed')
+                                    self.time_to_live_count += LifeForm.lifeforms[
+                                        collided_life_form_id].time_to_live_count
+
+                                    LifeForm.lifeforms[collided_life_form_id].entity_remove()
+
+                                    self.direction = self.previous_direction
+
+                                    collision_check = True
+                        else:
                             logger.debug('Other entity killed')
-
-                            self.time_to_live_count += LifeForm.lifeforms[collided_life_form_id].time_to_live_count
-                            self.weight += LifeForm.lifeforms[collided_life_form_id].weight
-                            self.strength += LifeForm.lifeforms[collided_life_form_id].strength
+                            self.time_to_live_count += LifeForm.lifeforms[
+                                collided_life_form_id].time_to_live_count
 
                             LifeForm.lifeforms[collided_life_form_id].entity_remove()
 
@@ -528,224 +577,191 @@ class LifeForm:
 
                             collision_check = True
 
-                        # if the other entities' aggression factor is higher it will be killed the current entity
-                        # it will be removed from the main loops list of entities
-                        elif LifeForm.lifeforms[collided_life_form_id].strength > self.strength:
-                            logger.debug('Current entity killed')
-
-                            LifeForm.lifeforms[collided_life_form_id].time_to_live_count += self.time_to_live_count
-                            LifeForm.lifeforms[collided_life_form_id].weight += self.weight
-                            LifeForm.lifeforms[collided_life_form_id].strength += self.strength
-
-                            collision_check = "Died"
-
-                        elif LifeForm.lifeforms[collided_life_form_id].strength == self.strength:
-                            logger.debug('Entities matched, flipping coin')
-
-                            if random.random() < .5:
-                                logger.debug('Current entity killed')
-                                LifeForm.lifeforms[collided_life_form_id].time_to_live_count += self.time_to_live_count
-                                LifeForm.lifeforms[collided_life_form_id].weight += self.weight
-                                LifeForm.lifeforms[collided_life_form_id].strength += self.strength
-
-                                collision_check = "Died"
-
-                            else:
-                                logger.debug('Other entity killed')
-                                self.time_to_live_count += LifeForm.lifeforms[
-                                    collided_life_form_id].time_to_live_count
-
-                                LifeForm.lifeforms[collided_life_form_id].entity_remove()
-
-                                self.direction = self.previous_direction
-
-                                collision_check = True
-                    else:
-                        logger.debug('Other entity killed')
-                        self.time_to_live_count += LifeForm.lifeforms[
-                            collided_life_form_id].time_to_live_count
-
-                        LifeForm.lifeforms[collided_life_form_id].entity_remove()
-
-                        self.direction = self.previous_direction
-
-                        collision_check = True
-
-            collision_check = True
-        else:
-            collision_check = False
-
-        if collision_check == "Died":
-            return collision_check
-        elif not collision_check:
-            current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
-
-            if self.direction == 'move_up':
-                self.matrix_position_y -= 1
-                self.momentum -= 2
-
-            if self.direction == 'move_down':
-                self.matrix_position_y += 1
-                if current_session.gravity_on:
-                    self.momentum += 1
-                else:
-                    self.momentum -= 2
-
-            if self.direction == 'move_left':
-                self.matrix_position_x -= 1
-                self.momentum -= 2
-
-            if self.direction == 'move_right':
-                self.matrix_position_x += 1
-                self.momentum -= 2
-
-            if self.direction == 'move_up_and_right':
-                self.matrix_position_y -= 1
-                self.matrix_position_x += 1
-                self.momentum -= 2
-
-            if self.direction == 'move_up_and_left':
-                self.matrix_position_y -= 1
-                self.matrix_position_x -= 1
-                self.momentum -= 2
-
-            if self.direction == 'move_down_and_right':
-                self.matrix_position_y += 1
-                self.matrix_position_x += 1
-                if current_session.gravity_on:
-                    self.momentum += 1
-                else:
-                    self.momentum -= 2
-
-            if self.direction == 'move_down_and_left':
-                self.matrix_position_y += 1
-                self.matrix_position_x -= 1
-                if current_session.gravity_on:
-                    self.momentum += 1
-                else:
-                    self.momentum -= 2
-
-            if self.direction == 'still':
-                pass
-
-            if self.momentum <= 0:
-                self.momentum = 0
-            elif self.momentum >= 100:
-                self.momentum = 100
-
-            # write new position in the buffer
-            current_session.world_space_access.write_to_world_space(
-                (self.matrix_position_x, self.matrix_position_y),
-                (self.red_color, self.green_color,
-                 self.blue_color), self.life_form_id)
-
-            # minus 1 from the time to move count until it hits 0, at which point the entity will change
-            # direction from the "randomise direction" function being called
-            if not self.linked_up:
-                if self.time_to_move_count > 0:
-                    self.time_to_move_count -= 1
-                elif self.time_to_move_count <= 0:
-                    self.time_to_move_count = self.time_to_move
-                    if not self.direction == self.preferred_direction:
-                        self.direction = self.preferred_direction
-                    else:
-                        self.direction = random.choice(current_session.directions)
+                collision_check = True
             else:
-                # if combining is enabled set to the direction of the linked entity, however the other entity may
-                # have expired and weird things happen, and it may not be accessible from within the class holder
-                # so just randomise direction and de-link
-                try:
-                    self.direction = LifeForm.lifeforms[self.linked_to].direction
-                except KeyError:
-                    self.linked_up = False
-                    if not self.direction == self.preferred_direction:
-                        self.direction = self.preferred_direction
+                collision_check = False
+
+            if collision_check == "Died":
+                return collision_check
+            elif not collision_check:
+                current_session.world_space_access.del_world_space_item(
+                    (self.matrix_position_x, self.matrix_position_y))
+
+                if self.direction == 'move_up':
+                    self.matrix_position_y -= 1
+                    self.momentum -= 2
+
+                if self.direction == 'move_down':
+                    self.matrix_position_y += 1
+                    if current_session.gravity_on:
+                        self.momentum += 1
                     else:
-                        self.direction = random.choice(current_session.directions)
+                        self.momentum -= 2
 
-        # the breeding will attempt only if the current life form count is not above the
-        # population limit
-        if self.waiting_to_spawn:
-            if current_session.current_life_form_amount < args.pop_limit:
-                # find a place for the new entity to spawn around the current parent life form
+                if self.direction == 'move_left':
+                    self.matrix_position_x -= 1
+                    self.momentum -= 2
 
-                if preferred_direction == 'get_position_right':
-                    self.adj_position = self.matrix_position_x + 1, self.matrix_position_y
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_left':
-                    self.adj_position = self.matrix_position_x - 1, self.matrix_position_y
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_down':
-                    self.adj_position = self.matrix_position_x, self.matrix_position_y + 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_up':
-                    self.adj_position = self.matrix_position_x, self.matrix_position_y - 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_down_and_right':
-                    self.adj_position = self.matrix_position_x + 1, self.matrix_position_y + 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_up_and_left':
-                    self.adj_position = self.matrix_position_x - 1, self.matrix_position_y - 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_down_and_left':
-                    self.adj_position = self.matrix_position_x - 1, self.matrix_position_y + 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
-                elif preferred_direction == 'get_position_up_and_right':
-                    self.adj_position = self.matrix_position_x + 1, self.matrix_position_y - 1
-                    if self.adj_position not in current_session.coord_map:
-                        self.adj_position = None
+                if self.direction == 'move_right':
+                    self.matrix_position_x += 1
+                    self.momentum -= 2
 
-                if self.adj_position:
+                if self.direction == 'move_up_and_right':
+                    self.matrix_position_y -= 1
+                    self.matrix_position_x += 1
+                    self.momentum -= 2
+
+                if self.direction == 'move_up_and_left':
+                    self.matrix_position_y -= 1
+                    self.matrix_position_x -= 1
+                    self.momentum -= 2
+
+                if self.direction == 'move_down_and_right':
+                    self.matrix_position_y += 1
+                    self.matrix_position_x += 1
+                    if current_session.gravity_on:
+                        self.momentum += 1
+                    else:
+                        self.momentum -= 2
+
+                if self.direction == 'move_down_and_left':
+                    self.matrix_position_y += 1
+                    self.matrix_position_x -= 1
+                    if current_session.gravity_on:
+                        self.momentum += 1
+                    else:
+                        self.momentum -= 2
+
+                if self.direction == 'still':
+                    pass
+
+                if self.momentum <= 0:
+                    self.momentum = 0
+                elif self.momentum >= 100:
+                    self.momentum = 100
+
+                # write new position in the buffer
+                current_session.world_space_access.write_to_world_space(
+                    (self.matrix_position_x, self.matrix_position_y),
+                    (self.red_color, self.green_color,
+                     self.blue_color), self.life_form_id)
+
+                # minus 1 from the time to move count until it hits 0, at which point the entity will change
+                # direction from the "randomise direction" function being called
+                if not self.linked_up:
+                    if self.time_to_move_count > 0:
+                        self.time_to_move_count -= 1
+                    elif self.time_to_move_count <= 0:
+                        self.time_to_move_count = self.time_to_move
+                        if not self.direction == self.preferred_direction:
+                            self.direction = self.preferred_direction
+                        else:
+                            self.direction = random.choice(current_session.directions)
+                else:
+                    # if combining is enabled set to the direction of the linked entity, however the other entity may
+                    # have expired and weird things happen, and it may not be accessible from within the class holder
+                    # so just randomise direction and de-link
                     try:
-                        current_session.world_space_access.get_from_world_space(self.adj_position)[1]
-                    except TypeError:
-                        post_x_gen, post_y_gen = self.adj_position
+                        self.direction = LifeForm.lifeforms[self.linked_to].direction
+                    except KeyError:
+                        self.linked_up = False
+                        if not self.direction == self.preferred_direction:
+                            self.direction = self.preferred_direction
+                        else:
+                            self.direction = random.choice(current_session.directions)
 
+            # the breeding will attempt only if the current life form count is not above the
+            # population limit
+            if self.waiting_to_spawn:
+                if current_session.current_life_form_amount < args.pop_limit:
+                    # find a place for the new entity to spawn around the current parent life form
+
+                    if preferred_direction == 'get_position_right':
+                        self.adj_position = self.matrix_position_x + 1, self.matrix_position_y
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_left':
+                        self.adj_position = self.matrix_position_x - 1, self.matrix_position_y
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_down':
+                        self.adj_position = self.matrix_position_x, self.matrix_position_y + 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_up':
+                        self.adj_position = self.matrix_position_x, self.matrix_position_y - 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_down_and_right':
+                        self.adj_position = self.matrix_position_x + 1, self.matrix_position_y + 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_up_and_left':
+                        self.adj_position = self.matrix_position_x - 1, self.matrix_position_y - 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_down_and_left':
+                        self.adj_position = self.matrix_position_x - 1, self.matrix_position_y + 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+                    elif preferred_direction == 'get_position_up_and_right':
+                        self.adj_position = self.matrix_position_x + 1, self.matrix_position_y - 1
+                        if self.adj_position not in current_session.coord_map:
+                            self.adj_position = None
+
+                    if self.adj_position:
+                        try:
+                            current_session.world_space_access.get_from_world_space(self.adj_position)[1]
+                        except TypeError:
+                            post_x_gen, post_y_gen = self.adj_position
+
+                        else:
+
+                            post_x_gen, post_y_gen = None, None
+                            self.waiting_to_spawn = True
                     else:
-
                         post_x_gen, post_y_gen = None, None
                         self.waiting_to_spawn = True
-                else:
-                    post_x_gen, post_y_gen = None, None
+
+                    if post_x_gen is not None and post_y_gen is not None:
+                        # increase the life form total by 1
+                        current_session.life_form_total_count += 1
+
+                        LifeForm(
+                            life_form_id=current_session.life_form_total_count,
+                            seed=self.waiting_seed1,
+                            seed2=self.waiting_seed2,
+                            seed3=self.waiting_seed3,
+                            start_x=post_x_gen,
+                            start_y=post_y_gen,
+                            max_attrib_expand=self.waiting_max_attrib_expand)
+
+                        logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
+
+                        self.waiting_to_spawn = False
+
+                # if the current amount of life forms on the board is at the population limit or above
+                # then do nothing
+                elif current_session.current_life_form_amount >= args.pop_limit:
+                    logger.debug(f"Max life form limit: {args.pop_limit} reached")
                     self.waiting_to_spawn = True
 
-                if post_x_gen is not None and post_y_gen is not None:
-                    # increase the life form total by 1
-                    current_session.life_form_total_count += 1
+            if self.strength < self.weight:
+                self.direction = 'still'
 
-                    LifeForm(
-                        life_form_id=current_session.life_form_total_count,
-                        seed=self.waiting_seed1,
-                        seed2=self.waiting_seed2,
-                        seed3=self.waiting_seed3,
-                        start_x=post_x_gen,
-                        start_y=post_y_gen,
-                        max_attrib_expand=self.waiting_max_attrib_expand)
+            if current_session.gravity_on and (self.strength < self.weight or self.direction == 'still'
+                                               or self.momentum <= 0):
+                self.direction = 'move_down'
+                logger.debug(f"Moved from gravity")
 
-                    logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
-
-                    self.waiting_to_spawn = False
-
-            # if the current amount of life forms on the board is at the population limit or above
-            # then do nothing
-            elif current_session.current_life_form_amount >= args.pop_limit:
-                logger.debug(f"Max life form limit: {args.pop_limit} reached")
-                self.waiting_to_spawn = True
-
-        if self.strength < self.weight:
-            self.direction = 'still'
-
-        if current_session.gravity_on and (self.strength < self.weight or self.direction == 'still'
-                                           or self.momentum <= 0):
-            self.direction = 'move_down'
-            logger.debug(f"Moved from gravity")
+        except KeyError:
+            logger.debug(f"Missing entity: {self.life_form_id}")
+            # print(f"Missing entity: {self.life_form_id}")
+            try:
+                print(LifeForm.lifeforms[collided_life_form_id].life_form_id)
+            except UnboundLocalError:
+                pass
+            return
 
     def entity_remove(self):
         """
@@ -783,13 +799,27 @@ class DrawObjects(ScreenDrawer):
         self.render_stack = [
             'object_colour_pass',
             'removed_object_colour_pass',
-            'log_current_frame',
             'fade_entity_pass',
             'tone_map_pass',
             'render_frame_buffer',
             'float_to_rgb_pass',
             'buffer_scan',
             'flush_buffer']
+
+        # with lens flares and lighting
+        # self.render_stack = ['background_shader_pass',
+        #                      'object_colour_pass',
+        #                      'removed_object_colour_pass',
+        #                      'fade_entity_pass',
+        #                      'log_current_frame',
+        #                      'lighting_pass',
+        #                      'tone_map_pass',
+        #                      'render_frame_buffer',
+        #                      'float_to_rgb_pass',
+        #                      'sprite_pass',
+        #                      'write_texture',
+        #                      'buffer_scan',
+        #                      'flush_buffer']
 
         self.draw()
 
@@ -969,7 +999,7 @@ def show_currents_stats():
     Show the current stats of the session
     :return:
     """
-    logger.info(current_session)
+    logging.info(pretty_print_dataclass(current_session))
 
 
 def class_generator(life_form_id):
