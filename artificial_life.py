@@ -15,8 +15,6 @@ from pynput.keyboard import KeyCode, Listener
 
 from collections import deque
 
-# from mcpi.minecraft import Minecraft
-
 renderer_dir = os.path.join(os.path.dirname(__file__), 'pixel_composer')
 
 sys.path.append(renderer_dir)
@@ -34,6 +32,14 @@ logger = logging.getLogger("alife-logger")
 
 
 def diagonal_distance(x1, y1, x2, y2):
+    """
+    Calculates the diagonal distance between two points
+    :param x1:
+    :param y1:
+    :param x2:
+    :param y2:
+    :return:
+    """
     x_distance = x2 - x1
     y_distance = y2 - y1
     return sqrt(x_distance ** 2 + y_distance ** 2)
@@ -42,8 +48,7 @@ def diagonal_distance(x1, y1, x2, y2):
 @dataclass
 class Session:
     """
-    Class for storing current session information to make it easily accessible from within the LifeForm class and the
-    main logic loop
+    This class holds all the parameters for the current session
     """
     highest_concurrent_lifeforms: int
     max_enemy_factor: int
@@ -83,6 +88,10 @@ class Session:
         self.base_radiation = self.radiation
 
     def get_coord_map(self):
+        """
+        This method creates a shuffled list of coordinates
+        :return:
+        """
         self.shuffled_coord_map = list(self.coord_map)
 
         random.shuffle(self.shuffled_coord_map)
@@ -92,11 +101,17 @@ class Session:
         self.free_board_positions.extend(self.shuffled_coord_map)
 
     def get_dna_chaos_chance(self):
+        """
+        This method calculates the chance of a lifeforms DNA being mutated
+        :return:
+        """
         return self.dna_chaos_chance + percentage(self.radiation, self.dna_chaos_chance)
 
     def adjust_radiation_along_curve(self):
-        # "curve" should be a list of (x, y) points
-        # representing the curve
+        """
+        This method adjusts the radiation level according to the radiation curve
+        :return:
+        """
         if random.random() > self.radiation_base_change_chance:
             pass
         else:
@@ -118,12 +133,25 @@ class Session:
             self.buffer_ready = False
 
         def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_selector=1):
+            """
+            This method writes to the world space
+            :param pixel_coord:
+            :param pixel_rgb:
+            :param entity_id:
+            :param world_space_selector:
+            :return:
+            """
             if world_space_selector == 1:
                 self.world_space[pixel_coord] = pixel_rgb, entity_id
             elif world_space_selector == 2:
                 self.world_space_2[pixel_coord] = pixel_rgb, entity_id
 
         def return_world_space(self, world_space_selector=1):
+            """
+            This method returns the world space
+            :param world_space_selector:
+            :return:
+            """
             if world_space_selector == 1:
                 return {key: value[0] for key, value in self.world_space.copy().items()}
             elif world_space_selector == 2:
@@ -132,6 +160,12 @@ class Session:
                 return world_space_2_return
 
         def get_from_world_space(self, pixel_coord, world_space_selector=1):
+            """
+            This method returns the value of a pixel in the world space
+            :param pixel_coord:
+            :param world_space_selector:
+            :return:
+            """
             if world_space_selector == 1:
                 try:
                     return self.world_space[pixel_coord]
@@ -144,6 +178,12 @@ class Session:
                     return None
 
         def del_world_space_item(self, coord, world_space_selector=1):
+            """
+            This method deletes an item from the world space
+            :param coord:
+            :param world_space_selector:
+            :return:
+            """
             if world_space_selector == 1:
                 try:
                     del self.world_space[coord]
@@ -156,6 +196,11 @@ class Session:
                     pass
 
         def erase_world_space(self, world_space_selector=1):
+            """
+            This method erases the world space
+            :param world_space_selector:
+            :return:
+            """
             if world_space_selector == 1:
                 self.world_space = {"end": "ended"}
             elif world_space_selector == 2:
@@ -268,6 +313,14 @@ class LifeForm:
                                                                 self.life_form_id)
 
     def get_dna(self, dna_key, collided_life_form_id):
+        """
+        This method is used to get the dna either from the life form that is being collided with or the entity
+        itself, it will return the dna 50% of the time from the entity and 50% of the time from the collided entity,
+        or depending on the dna chaos chance it will return a random dna value
+        :param dna_key:
+        :param collided_life_form_id:
+        :return:
+        """
         dna_chaos = floor(100 * random.random())
         if dna_chaos <= current_session.get_dna_chaos_chance():
             return get_random()
@@ -290,7 +343,8 @@ class LifeForm:
 
     def get_stats(self):
         """
-        Display stats of life form.
+        This method is used to get the stats of the life form
+        :return:
         """
         logger.debug(f'ID: {self.life_form_id}')
         logger.debug(f'Seed 1: {self.life_seed1}')
@@ -311,10 +365,9 @@ class LifeForm:
 
     def process(self):
         """
-        Will move the entity in its currently set direction (with 8 possible directions), if it hits the
-        edge of the board it will then assign a new random direction to go in, this function also handles the time to
-        move count which when hits 0 will select a new random direction for the entity regardless of whether it has hit
-        the edge of the board or another entity.
+        This method is used to process the life form, it will check if the life form is dead, if it is it will remove
+        it, this also handles all movement and breeding as well as gravity and momentum adjustments
+        :return:
         """
 
         try:
@@ -696,10 +749,8 @@ class LifeForm:
 
     def entity_remove(self):
         """
-        Due to the fact the class holder needs copying to be able to iterate and modify it at the same time we can
-        have dead entities being looped over before the current board has been processed, so we need to remove the
-        entity from the board entirely and blank it on top of the alive check that will skip it, to double ensure a
-        dead entity is no longer interacted with during a loop that it died in.
+        Removes an entity from the board.
+        :return:
         """
         current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
         self.alive = False
@@ -709,7 +760,8 @@ class LifeForm:
 
     def fade_entity(self):
         """
-        Erases an entity from the board by fading it away.
+        Fades an entity from the board using shaders from Pixel Composer.
+        :return:
         """
         current_session.world_space_access.write_to_world_space(
             (self.matrix_position_x, self.matrix_position_y),
@@ -742,6 +794,10 @@ class DrawObjects(ScreenDrawer):
         self.draw()
 
     def fade_entity_pass(self):
+        """
+        Uses the motion blur shader to fade entities from the board.
+        :return:
+        """
         # todo: convert this to list comprehension? and tidy it up
         for coord, pixel in self.frame_buffer_access.removed_entity_buffer.items():
             new_pixel = self.frame_buffer_access.motion_blur.run_shader(pixel)
@@ -750,6 +806,10 @@ class DrawObjects(ScreenDrawer):
                 self.frame_buffer_access.write_to_removed_entity_buffer(coord, new_pixel)
 
     def removed_object_colour_pass(self):
+        """
+        Adds the removed entity buffer to the render plane.
+        :return:
+        """
         [self.frame_buffer_access.write_to_removed_entity_buffer(coord, pixel) for coord, pixel in
          self.world_space_access.return_world_space(2).items()]
 
@@ -783,20 +843,40 @@ class FrameBufferInit(FrameBuffer):
         self.lighting.moving_light = False
 
     def write_to_removed_entity_buffer(self, pixel_coord, pixel_rgb):
+        """
+        Writes to the removed entity buffer.
+        :param pixel_coord:
+        :param pixel_rgb:
+        :return:
+        """
         self.removed_entity_buffer[pixel_coord] = pixel_rgb
 
 
 def on_press(key):
+    """
+    Listens for key presses and calls the appropriate function.
+    :param key:
+    :return:
+    """
     if key == KeyCode(char='T'):
         thanos_snap()
     if key == KeyCode(char='G'):
         gravity_switch()
     if key == KeyCode(char='F'):
         render_switch()
+    if key == KeyCode(char='R'):
+        increase_max_radiation()
+    if key == KeyCode(char='r'):
+        decrease_max_radiation()
+    if key == KeyCode(char='S'):
+        show_currents_stats()
 
 
 def global_board_generator():
-    # with collision detection determine if a spot on the board contains a life form
+    """
+    Generates a global board for the life forms to live on, ensuring that no life form is spawned on top of another.
+    :return:
+    """
     try:
         random_free_coord = current_session.free_board_positions.popleft()
 
@@ -811,15 +891,18 @@ def global_board_generator():
 
 def percentage(percent, whole):
     """
-    Determine percentage of a whole number
+    Calculate a percentage of a whole number.
+    :param percent:
+    :param whole:
+    :return:
     """
     return int(round(percent * whole) / 100.0)
 
 
 def get_random():
     """
-    Generate a random number to be used as a seed, this is used to generate all 3 life seeds resulting in 1.e+36
-    possible types of life form.
+    Get a pseudo random number.
+    :return:
     """
     # todo: add in some sort of fibonacci sequence stuff in here?
     return random.getrandbits(500)
@@ -827,13 +910,11 @@ def get_random():
 
 def thanos_snap():
     """
-    Randomly kill half of the entities in existence on the board
+    Remove half of the life forms from the board
+    :return:
     """
-    # loop for 50% of all existing entities choosing at random to eliminate
     for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
         vanished = random.choice((list(LifeForm.lifeforms.values())))
-
-        # fade them away
         try:
             LifeForm.lifeforms[vanished.life_form_id].fade_entity()
         except KeyError:
@@ -842,18 +923,60 @@ def thanos_snap():
 
 
 def gravity_switch():
+    """
+    Switch the gravity on and off
+    :return:
+    """
     current_session.gravity_on = not current_session.gravity_on
 
 
 def render_switch():
+    """
+    Switch the rendering on and off
+    :return:
+    """
     current_session.rendering_on = not current_session.rendering_on
+
+
+def increase_max_radiation():
+    """
+    Increase the radiation level by 100, if radiation change is on then increase the max radiation level
+    :return:
+    """
+    if current_session.radiation_change:
+        current_session.radiation_max += 100
+        logger.info(f"Max radiation level increased to {current_session.radiation_max}")
+    else:
+        current_session.radiation += 100
+        logger.info(f"Radiation level increased to {current_session.radiation}")
+
+
+def decrease_max_radiation():
+    """
+    Decrease the radiation level by 100, if radiation change is on then decrease the max radiation level
+    :return:
+    """
+    if current_session.radiation_change:
+        current_session.radiation_max -= 100
+        logger.info(f"Max radiation level decreased to {current_session.radiation_max}")
+    else:
+        current_session.radiation -= 100
+        logger.info(f"Radiation level decreased to {current_session.radiation}")
+
+
+def show_currents_stats():
+    """
+    Show the current stats of the session
+    :return:
+    """
+    logger.info(current_session)
 
 
 def class_generator(life_form_id):
     """
-    Assign all the life_form_ids into class instances for each life form for each life_form_id in the list of all
-    life form life_form_ids assign a random x and y number for the position on the board and create the new life
-    form with random seeds for each life seed generation.
+    Generates a life form class based on the life form id.
+    :param life_form_id:
+    :return:
     """
     try:
         starting_x, starting_y = global_board_generator()
@@ -865,6 +988,11 @@ def class_generator(life_form_id):
 
 
 def main():
+    """
+    Main function, sets up the board and starts the main loop. Then processes all entities, if retries are enabled
+    then when all entities are gone it will respawn them and start again.
+    :return:
+    """
     frame_refresh_delay_ms = 1 / hat_buffer_refresh_rate
     """
     Main loop where all life form movement and interaction takes place
@@ -873,8 +1001,6 @@ def main():
     current_session.max_movement = diagonal_distance(0, 0, screen_controller.u_width, screen_controller.u_height)
     next_frame = time() + frame_refresh_delay_ms
     while True:
-        # todo: add in a check to see if the buffer is ready to be written to before writing to it, will need to
-        #  implement a buffer ready flag on the rasterizer side of things also
         # if time() > next_frame or not refresh_logic_link and current_session.world_space_access.buffer_ready:
         # for now this just checks whether the next frame time is ready or whether refresh logic is disabled
         # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
@@ -883,9 +1009,6 @@ def main():
         if time() > next_frame or not refresh_logic_link:
             # check the list of entities has items within
             if life_form_container:
-                # for time the current set of life forms is processed increase the layer for minecraft to set blocks
-                # on by 1
-                # for each life_form_id in the list use the life_form_id of the life form to work from
                 [life_form.process() for life_form in life_form_container]
 
             # if the main list of entities is empty then all have expired; the program displays final information
@@ -1008,11 +1131,6 @@ if __name__ == '__main__':
     screen_controller = ScreenController(screen_type=args.hat_edition, simulator=args.simulator,
                                          custom_size_simulator=args.custom_size_simulator,
                                          led_brightness=led_brightness)
-
-    # setup Minecraft connection if mc_mode is True
-    # if args.mc_mode:
-    #     mc = Minecraft.create()
-    #     mc.postToChat("PiLife Plugged into Minecraft!")
 
     current_session = Session(life_form_total_count=args.life_form_total,
                               max_enemy_factor=args.max_enemy_factor,
