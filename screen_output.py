@@ -20,7 +20,6 @@ logger = logging.getLogger("screen-output-logger")
 class ScreenController:
     def __init__(self, screen_type, simulator, custom_size_simulator, led_brightness):
         if screen_type == "PANEL":
-            # LED panel setup
             self.screen = PanelController(custom_size_simulator[0], custom_size_simulator[1], led_brightness)
         else:
             self.screen = UnicornHATController(screen_type, simulator, custom_size_simulator, led_brightness)
@@ -32,9 +31,12 @@ class ScreenController:
 
     def draw_pixels(self, pixel_coord, pixel_rgb, current_layer=0):
         """
-        Draw the position and colour of the current life form onto the board, if minecraft mode true, also set blocks
-        relative to the player in the game world, adding 1 to the layer every iteration so that each time the current
-        amount of entities is rendered it moves to another layer in minecraft, essentially building upwards.
+        Draw a pixel on the screen, ends loop if pixel_rgb is "e", will raise an exception if the pixel_coord is out
+        of range
+        :param pixel_coord:
+        :param pixel_rgb:
+        :param current_layer:
+        :return:
         """
         try:
             self.screen.set_pixel(pixel_coord[0], pixel_coord[1], pixel_rgb[0], pixel_rgb[1], pixel_rgb[2])
@@ -44,13 +46,6 @@ class ScreenController:
                 quit()
             else:
                 raise Exception(f"Set pixel did not like pixel coordinate: {pixel_coord} with RGB value: {pixel_rgb}")
-        # todo: improve this greatly and move it out of this class/module
-        # if args.mc_mode:
-        #     player_x, player_y, player_z = mc.player.getPos()
-        #     random.seed(r + g + b)
-        #     random_block = random.randint(1, 22)
-        #     random.seed()
-        #     mc.setBlock(player_x + x, player_y + 10 + current_layer, player_z + y, random_block)
 
     def show(self):
         """
