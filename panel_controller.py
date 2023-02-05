@@ -30,10 +30,27 @@ class PanelController(PanelSetup):
         self.offset_canvas = self.matrix.CreateFrameCanvas()
 
     def set_pixel(self, x, y, r, g, b):
+        """
+        Set a pixel on the screen
+        :param x:
+        :param y:
+        :param r:
+        :param g:
+        :param b:
+        :return:
+        """
         self.offset_canvas.SetPixel(x, y, r, g, b)
 
     def get_shape(self):
+        """
+        Get the shape of the panel for use in the simulator logic
+        :return:
+        """
         return self.options.cols, self.options.rows
 
     def show(self):
+        """
+        Show the screen, nothing will be displayed until this is called
+        :return:
+        """
         self.matrix.SwapOnVSync(self.offset_canvas)
