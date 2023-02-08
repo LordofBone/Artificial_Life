@@ -24,10 +24,7 @@ from pixel_composer.rasterizer import ScreenDrawer, FrameBuffer
 
 from threading import Thread
 
-from config.parameters import initial_lifeforms_count, population_limit, logging_level, initial_dna_chaos_chance, \
-    led_brightness, hat_model, hat_simulator_or_panel_size, hat_buffer_refresh_rate, refresh_logic_link, \
-    max_trait_number, \
-    initial_radiation, max_radiation, change_of_base_radiation_chance, radiation_dmg_multiplier, max_enemy_factor
+from config.parameters import *
 
 logger = logging.getLogger("alife-logger")
 
@@ -57,7 +54,9 @@ class Session:
     This class holds all the parameters for the current session
     """
     highest_concurrent_lifeforms: int
+    building_entities: bool
     max_enemy_factor: int
+    wall_chance_multiplier: int
     draw_trails: bool
     retries: bool
     radiation_change: bool
@@ -74,6 +73,7 @@ class Session:
     last_removal: int = -1
     current_life_form_amount: int = 0
     life_form_total_count: int = 0
+    process_loop_on: bool = True
 
     directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
                   'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
@@ -128,94 +128,108 @@ class Session:
                                                                              max([y for x, y in
                                                                                   self.radiation_curve])))), 0)
 
-    class WorldSpaceControl:
-        def __init__(self):
-            self.template_world_space = {}
 
+class WorldSpaceControl:
+    def __init__(self):
+        self.template_world_space = {}
+
+        self.world_space = {}
+
+        self.world_space_2 = {}
+
+        self.world_time = 0
+
+        self.world_space_time = {}
+
+        self.buffer_ready = False
+
+    def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_selector=1):
+        """
+        This method writes to the world space
+        :param pixel_coord:
+        :param pixel_rgb:
+        :param entity_id:
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
+            self.world_space[pixel_coord] = pixel_rgb, entity_id
+        elif world_space_selector == 2:
+            self.world_space_2[pixel_coord] = pixel_rgb, entity_id
+
+    def return_world_space(self, world_space_selector=1):
+        """
+        This method returns the world space
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
+            return {key: value[0] for key, value in self.world_space.copy().items()}
+        elif world_space_selector == 2:
+            world_space_2_return = {key: value[0] for key, value in self.world_space_2.copy().items()}
+            self.world_space_2 = {}
+            return world_space_2_return
+
+    def get_from_world_space(self, pixel_coord, world_space_selector=1):
+        """
+        This method returns the value of a pixel in the world space
+        :param pixel_coord:
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
+            try:
+                return self.world_space[pixel_coord]
+            except KeyError:
+                return None
+        elif world_space_selector == 2:
+            try:
+                return self.world_space_2[pixel_coord]
+            except KeyError:
+                return None
+
+    def del_world_space_item(self, coord, world_space_selector=1):
+        """
+        This method deletes an item from the world space
+        :param coord:
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
+            try:
+                del self.world_space[coord]
+            except KeyError:
+                pass
+        elif world_space_selector == 2:
+            try:
+                del self.world_space_2[coord]
+            except KeyError:
+                pass
+
+    def erase_world_space(self, world_space_selector=1):
+        """
+        This method erases the world space
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
             self.world_space = {}
-
+        elif world_space_selector == 2:
             self.world_space_2 = {}
 
-            self.buffer_ready = False
-
-        def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_selector=1):
-            """
-            This method writes to the world space
-            :param pixel_coord:
-            :param pixel_rgb:
-            :param entity_id:
-            :param world_space_selector:
-            :return:
-            """
-            if world_space_selector == 1:
-                self.world_space[pixel_coord] = pixel_rgb, entity_id
-            elif world_space_selector == 2:
-                self.world_space_2[pixel_coord] = pixel_rgb, entity_id
-
-        def return_world_space(self, world_space_selector=1):
-            """
-            This method returns the world space
-            :param world_space_selector:
-            :return:
-            """
-            if world_space_selector == 1:
-                return {key: value[0] for key, value in self.world_space.copy().items()}
-            elif world_space_selector == 2:
-                world_space_2_return = {key: value[0] for key, value in self.world_space_2.copy().items()}
-                self.world_space_2 = {}
-                return world_space_2_return
-
-        def get_from_world_space(self, pixel_coord, world_space_selector=1):
-            """
-            This method returns the value of a pixel in the world space
-            :param pixel_coord:
-            :param world_space_selector:
-            :return:
-            """
-            if world_space_selector == 1:
-                try:
-                    return self.world_space[pixel_coord]
-                except KeyError:
-                    return None
-            elif world_space_selector == 2:
-                try:
-                    return self.world_space_2[pixel_coord]
-                except KeyError:
-                    return None
-
-        def del_world_space_item(self, coord, world_space_selector=1):
-            """
-            This method deletes an item from the world space
-            :param coord:
-            :param world_space_selector:
-            :return:
-            """
-            if world_space_selector == 1:
-                try:
-                    del self.world_space[coord]
-                except KeyError:
-                    pass
-            elif world_space_selector == 2:
-                try:
-                    del self.world_space_2[coord]
-                except KeyError:
-                    pass
-
-        def erase_world_space(self, world_space_selector=1):
-            """
-            This method erases the world space
-            :param world_space_selector:
-            :return:
-            """
-            if world_space_selector == 1:
-                self.world_space = {"end": "ended"}
-            elif world_space_selector == 2:
-                self.world_space_2 = {"end": "ended"}
-
-    world_space_access = WorldSpaceControl()
+    def end_world_space(self, world_space_selector=1):
+        """
+        This method sets the world space to end, which is picked up by the rasterizer, which ends its loop
+        :param world_space_selector:
+        :return:
+        """
+        if world_space_selector == 1:
+            self.world_space = {"end": "ended"}
+        elif world_space_selector == 2:
+            self.world_space_2 = {"end": "ended"}
 
 
-class LifeForm:
+class BaseEntity:
     """
     The main class that handles each life forms initialisation, movement, colour, expiry and statistics.
     """
@@ -240,7 +254,10 @@ class LifeForm:
         # set life form life status
         self.alive = True
 
+        self.wall = False
+
         self.waiting_to_spawn = False
+        self.waiting_to_build = False
 
         self.waiting_seed1 = None
         self.waiting_seed2 = None
@@ -258,7 +275,7 @@ class LifeForm:
         self.life_seed2 = seed2
         self.life_seed3 = seed3
 
-        self.max_attribute = current_session.max_attribute + max_attrib_expand
+        self.max_attribute = current_session.max_attribute
 
         # life seed 1 controls the random number generation for the red colour, maximum aggression factor starting
         # direction and maximum possible lifespan
@@ -288,6 +305,8 @@ class LifeForm:
         self.time_to_move_count = self.time_to_move
         self.combine_threshold = floor(self.max_attribute * random.random())
         self.bouncy = random.choice([True, False])
+        self.builder = random.choice([True, False])
+        self.wall_factor = floor(current_session.wall_chance_multiplier * random.random())
 
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
@@ -302,6 +321,12 @@ class LifeForm:
         self.compatibility_factor = floor(self.max_attribute * random.random())
         self.direction = random.choice(current_session.directions)
         self.preferred_direction = self.direction
+        if not self.wall_factor == 0:
+            self.time_to_build = floor(self.max_attribute * random.random()) / self.wall_factor
+        else:
+            self.time_to_build = floor(self.max_attribute * random.random())
+
+        self.time_to_build_count = self.time_to_build
 
         # reset the global random seed
         random.seed()
@@ -314,9 +339,9 @@ class LifeForm:
 
         self.lifeforms.update({self.life_form_id: self})
 
-        current_session.world_space_access.write_to_world_space((self.matrix_position_x, self.matrix_position_y),
-                                                                (self.red_color, self.green_color, self.blue_color),
-                                                                self.life_form_id)
+        world_space_access.write_to_world_space((self.matrix_position_x, self.matrix_position_y),
+                                                (self.red_color, self.green_color, self.blue_color),
+                                                self.life_form_id)
 
     def get_dna(self, dna_key, collided_life_form_id):
         """
@@ -335,17 +360,17 @@ class LifeForm:
                 if random.random() < .5:
                     return self.life_seed1
                 else:
-                    return LifeForm.lifeforms[collided_life_form_id].life_seed1
+                    return BaseEntity.lifeforms[collided_life_form_id].life_seed1
             elif dna_key == 2:
                 if random.random() < .5:
                     return self.life_seed2
                 else:
-                    return LifeForm.lifeforms[collided_life_form_id].life_seed2
+                    return BaseEntity.lifeforms[collided_life_form_id].life_seed2
             elif dna_key == 3:
                 if random.random() < .5:
                     return self.life_seed3
                 else:
-                    return LifeForm.lifeforms[collided_life_form_id].life_seed3
+                    return BaseEntity.lifeforms[collided_life_form_id].life_seed3
 
     def get_stats(self):
         """
@@ -389,7 +414,14 @@ class LifeForm:
                 self.entity_remove()
                 return
 
-            current_session.current_life_form_amount = len(list(LifeForm.lifeforms.values()))
+            if not self.waiting_to_build and current_session.building_entities:
+                if self.time_to_build_count > 0:
+                    self.time_to_build_count -= 1
+                elif self.time_to_build_count <= 0:
+                    self.time_to_build_count = self.time_to_build
+                    self.waiting_to_build = True
+
+            current_session.current_life_form_amount = len(list(BaseEntity.lifeforms.values()))
             # if the current number of active life forms is higher than the previous record of concurrent
             # life forms, update the concurrent life forms variable
             if current_session.current_life_form_amount > current_session.highest_concurrent_lifeforms:
@@ -440,7 +472,7 @@ class LifeForm:
 
                     try:
                         s_item_life_form_id = \
-                            current_session.world_space_access.get_from_world_space(self.adj_position)[1]
+                            world_space_access.get_from_world_space(self.adj_position)[1]
                         collision_detected = True
                         collided_life_form_id = s_item_life_form_id
                     except TypeError:
@@ -452,7 +484,7 @@ class LifeForm:
                 collision_detected = False
                 collided_life_form_id = None
 
-            if self.waiting_to_spawn:
+            if self.waiting_to_spawn or self.waiting_to_build:
                 preferred_direction = random.choice(current_session.surrounding_point_choices)
 
             # get the count of total life forms currently active
@@ -477,105 +509,104 @@ class LifeForm:
                     self.direction = random.choice(current_session.directions)
 
                 if collided_life_form_id:
-                    # todo: apply this to the whole loop to prevent weird things when thanos snap happens
-                    try:
-                        LifeForm.lifeforms[collided_life_form_id].momentum += momentum_reduction
-                    except KeyError:
-                        pass
+                    if not BaseEntity.lifeforms[collided_life_form_id].wall:
+                        BaseEntity.lifeforms[collided_life_form_id].momentum += momentum_reduction
 
-                    # if the aggression factor is below the entities breed threshold the life form will attempt to
-                    # breed with the one it collided with
-                    if abs(self.aggression_factor - LifeForm.lifeforms[collided_life_form_id].aggression_factor) \
-                            <= self.breed_threshold:
-                        # the other entity also needs to have its aggression factor below its breed threshold
+                        # if the aggression factor is below the entities breed threshold the life form will attempt to
+                        # breed with the one it collided with
+                        if abs(self.aggression_factor - BaseEntity.lifeforms[collided_life_form_id].aggression_factor) \
+                                <= self.breed_threshold:
+                            # the other entity also needs to have its aggression factor below its breed threshold
 
-                        if self.compatibility_factor + self.combine_threshold > \
-                                LifeForm.lifeforms[
-                                    collided_life_form_id].compatibility_factor > self.compatibility_factor - self.combine_threshold:
-                            if args.combine_mode:
-                                logger.debug(f'Entity: {self.life_form_id} combined with: {collided_life_form_id}')
+                            if self.compatibility_factor + self.combine_threshold > \
+                                    BaseEntity.lifeforms[
+                                        collided_life_form_id].compatibility_factor > self.compatibility_factor - self.combine_threshold:
+                                if args.combine_mode:
+                                    logger.debug(f'Entity: {self.life_form_id} combined with: {collided_life_form_id}')
 
-                                LifeForm.lifeforms[collided_life_form_id].linked_up = True
-                                LifeForm.lifeforms[collided_life_form_id].linked_to = self.life_form_id
+                                    BaseEntity.lifeforms[collided_life_form_id].linked_up = True
+                                    BaseEntity.lifeforms[collided_life_form_id].linked_to = self.life_form_id
 
-                                LifeForm.lifeforms[collided_life_form_id].direction = self.direction
+                                    BaseEntity.lifeforms[collided_life_form_id].direction = self.direction
 
-                        if not self.waiting_to_spawn:
-                            if random.random() < .5:
-                                attrib_boost = self.max_attribute
-                            else:
-                                attrib_boost = LifeForm.lifeforms[collided_life_form_id].max_attribute
-
-                            preferred_direction = self.preferred_breed_direction
-                            self.waiting_seed1 = self.get_dna(1, collided_life_form_id)
-                            self.waiting_seed2 = self.get_dna(2, collided_life_form_id)
-                            self.waiting_seed3 = self.get_dna(3, collided_life_form_id)
-                            self.waiting_max_attrib_expand = attrib_boost
-                            self.waiting_to_spawn = True
-
-                    else:
-                        if not LifeForm.lifeforms[collided_life_form_id].aggression_factor < \
-                               LifeForm.lifeforms[collided_life_form_id].breed_threshold:
-
-                            # if the other entities' aggression factor is lower it will be killed and removed from the
-                            # main loops list of entities
-
-                            if LifeForm.lifeforms[collided_life_form_id].strength < self.strength:
-                                logger.debug('Other entity killed')
-
-                                self.time_to_live_count += LifeForm.lifeforms[collided_life_form_id].time_to_live_count
-                                self.weight += LifeForm.lifeforms[collided_life_form_id].weight
-                                self.strength += LifeForm.lifeforms[collided_life_form_id].strength
-
-                                LifeForm.lifeforms[collided_life_form_id].entity_remove()
-
-                                self.direction = self.previous_direction
-
-                                collision_check = True
-
-                            # if the other entities' aggression factor is higher it will be killed the current entity
-                            # it will be removed from the main loops list of entities
-                            elif LifeForm.lifeforms[collided_life_form_id].strength > self.strength:
-                                logger.debug('Current entity killed')
-
-                                LifeForm.lifeforms[collided_life_form_id].time_to_live_count += self.time_to_live_count
-                                LifeForm.lifeforms[collided_life_form_id].weight += self.weight
-                                LifeForm.lifeforms[collided_life_form_id].strength += self.strength
-
-                                collision_check = "Died"
-
-                            elif LifeForm.lifeforms[collided_life_form_id].strength == self.strength:
-                                logger.debug('Entities matched, flipping coin')
-
+                            if not self.waiting_to_spawn:
                                 if random.random() < .5:
-                                    logger.debug('Current entity killed')
-                                    LifeForm.lifeforms[
-                                        collided_life_form_id].time_to_live_count += self.time_to_live_count
-                                    LifeForm.lifeforms[collided_life_form_id].weight += self.weight
-                                    LifeForm.lifeforms[collided_life_form_id].strength += self.strength
-
-                                    collision_check = "Died"
-
+                                    attrib_boost = self.max_attribute
                                 else:
-                                    logger.debug('Other entity killed')
-                                    self.time_to_live_count += LifeForm.lifeforms[
-                                        collided_life_form_id].time_to_live_count
+                                    attrib_boost = BaseEntity.lifeforms[collided_life_form_id].max_attribute
 
-                                    LifeForm.lifeforms[collided_life_form_id].entity_remove()
+                                preferred_direction = self.preferred_breed_direction
+                                self.waiting_seed1 = self.get_dna(1, collided_life_form_id)
+                                self.waiting_seed2 = self.get_dna(2, collided_life_form_id)
+                                self.waiting_seed3 = self.get_dna(3, collided_life_form_id)
+                                self.waiting_max_attrib_expand = attrib_boost
+                                self.waiting_to_spawn = True
+
+                        else:
+                            if not BaseEntity.lifeforms[collided_life_form_id].aggression_factor < \
+                                   BaseEntity.lifeforms[collided_life_form_id].breed_threshold:
+
+                                # if the other entities' aggression factor is lower it will be killed and removed from the
+                                # main loops list of entities
+
+                                if BaseEntity.lifeforms[collided_life_form_id].strength < self.strength:
+                                    logger.debug('Other entity killed')
+
+                                    self.time_to_live_count += BaseEntity.lifeforms[
+                                        collided_life_form_id].time_to_live_count
+                                    self.weight += BaseEntity.lifeforms[collided_life_form_id].weight
+                                    self.strength += BaseEntity.lifeforms[collided_life_form_id].strength
+
+                                    BaseEntity.lifeforms[collided_life_form_id].entity_remove()
 
                                     self.direction = self.previous_direction
 
                                     collision_check = True
-                        else:
-                            logger.debug('Other entity killed')
-                            self.time_to_live_count += LifeForm.lifeforms[
-                                collided_life_form_id].time_to_live_count
 
-                            LifeForm.lifeforms[collided_life_form_id].entity_remove()
+                                # if the other entities' aggression factor is higher it will be killed the current entity
+                                # it will be removed from the main loops list of entities
+                                elif BaseEntity.lifeforms[collided_life_form_id].strength > self.strength:
+                                    logger.debug('Current entity killed')
 
-                            self.direction = self.previous_direction
+                                    BaseEntity.lifeforms[
+                                        collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                    BaseEntity.lifeforms[collided_life_form_id].weight += self.weight
+                                    BaseEntity.lifeforms[collided_life_form_id].strength += self.strength
 
-                            collision_check = True
+                                    collision_check = "Died"
+
+                                elif BaseEntity.lifeforms[collided_life_form_id].strength == self.strength:
+                                    logger.debug('Entities matched, flipping coin')
+
+                                    if random.random() < .5:
+                                        logger.debug('Current entity killed')
+                                        BaseEntity.lifeforms[
+                                            collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                        BaseEntity.lifeforms[collided_life_form_id].weight += self.weight
+                                        BaseEntity.lifeforms[collided_life_form_id].strength += self.strength
+
+                                        collision_check = "Died"
+
+                                    else:
+                                        logger.debug('Other entity killed')
+                                        self.time_to_live_count += BaseEntity.lifeforms[
+                                            collided_life_form_id].time_to_live_count
+
+                                        BaseEntity.lifeforms[collided_life_form_id].entity_remove()
+
+                                        self.direction = self.previous_direction
+
+                                        collision_check = True
+                            else:
+                                logger.debug('Other entity killed')
+                                self.time_to_live_count += BaseEntity.lifeforms[
+                                    collided_life_form_id].time_to_live_count
+
+                                BaseEntity.lifeforms[collided_life_form_id].entity_remove()
+
+                                self.direction = self.previous_direction
+
+                                collision_check = True
 
                 collision_check = True
             else:
@@ -584,7 +615,7 @@ class LifeForm:
             if collision_check == "Died":
                 return collision_check
             elif not collision_check:
-                current_session.world_space_access.del_world_space_item(
+                world_space_access.del_world_space_item(
                     (self.matrix_position_x, self.matrix_position_y))
 
                 if self.direction == 'move_up':
@@ -641,7 +672,7 @@ class LifeForm:
                     self.momentum = 100
 
                 # write new position in the buffer
-                current_session.world_space_access.write_to_world_space(
+                world_space_access.write_to_world_space(
                     (self.matrix_position_x, self.matrix_position_y),
                     (self.red_color, self.green_color,
                      self.blue_color), self.life_form_id)
@@ -662,7 +693,7 @@ class LifeForm:
                     # have expired and weird things happen, and it may not be accessible from within the class holder
                     # so just randomise direction and de-link
                     try:
-                        self.direction = LifeForm.lifeforms[self.linked_to].direction
+                        self.direction = BaseEntity.lifeforms[self.linked_to].direction
                     except KeyError:
                         self.linked_up = False
                         if not self.direction == self.preferred_direction:
@@ -672,7 +703,7 @@ class LifeForm:
 
             # the breeding will attempt only if the current life form count is not above the
             # population limit
-            if self.waiting_to_spawn:
+            if self.waiting_to_spawn or self.waiting_to_build:
                 if current_session.current_life_form_amount < args.pop_limit:
                     # find a place for the new entity to spawn around the current parent life form
 
@@ -711,7 +742,7 @@ class LifeForm:
 
                     if self.adj_position:
                         try:
-                            current_session.world_space_access.get_from_world_space(self.adj_position)[1]
+                            world_space_access.get_from_world_space(self.adj_position)[1]
                         except TypeError:
                             post_x_gen, post_y_gen = self.adj_position
 
@@ -723,28 +754,48 @@ class LifeForm:
                         post_x_gen, post_y_gen = None, None
                         self.waiting_to_spawn = True
 
-                    if post_x_gen is not None and post_y_gen is not None:
-                        # increase the life form total by 1
-                        current_session.life_form_total_count += 1
+                    if not self.waiting_to_spawn and self.waiting_to_build:
+                        if post_x_gen is not None and post_y_gen is not None:
+                            # increase the life form total by 1
+                            current_session.life_form_total_count += 1
 
-                        LifeForm(
-                            life_form_id=current_session.life_form_total_count,
-                            seed=self.waiting_seed1,
-                            seed2=self.waiting_seed2,
-                            seed3=self.waiting_seed3,
-                            start_x=post_x_gen,
-                            start_y=post_y_gen,
-                            max_attrib_expand=self.waiting_max_attrib_expand)
+                            Wall(
+                                life_form_id=current_session.life_form_total_count,
+                                seed=self.waiting_seed1,
+                                seed2=self.waiting_seed2,
+                                seed3=self.waiting_seed3,
+                                start_x=post_x_gen,
+                                start_y=post_y_gen,
+                                max_attrib_expand=self.waiting_max_attrib_expand)
 
-                        logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
+                            logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
-                        self.waiting_to_spawn = False
+                            self.waiting_to_build = False
+
+                    elif self.waiting_to_spawn:
+                        if post_x_gen is not None and post_y_gen is not None:
+                            # increase the life form total by 1
+                            current_session.life_form_total_count += 1
+
+                            LifeForm(
+                                life_form_id=current_session.life_form_total_count,
+                                seed=self.waiting_seed1,
+                                seed2=self.waiting_seed2,
+                                seed3=self.waiting_seed3,
+                                start_x=post_x_gen,
+                                start_y=post_y_gen,
+                                max_attrib_expand=self.waiting_max_attrib_expand)
+
+                            logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
+
+                            self.waiting_to_spawn = False
 
                 # if the current amount of life forms on the board is at the population limit or above
                 # then do nothing
                 elif current_session.current_life_form_amount >= args.pop_limit:
                     logger.debug(f"Max life form limit: {args.pop_limit} reached")
                     self.waiting_to_spawn = True
+                    self.waiting_to_build = True
 
             if self.strength < self.weight:
                 self.direction = 'still'
@@ -756,9 +807,10 @@ class LifeForm:
 
         except KeyError:
             logger.debug(f"Missing entity: {self.life_form_id}")
-            # print(f"Missing entity: {self.life_form_id}")
             try:
-                print(LifeForm.lifeforms[collided_life_form_id].life_form_id)
+                BaseEntity.lifeforms[collided_life_form_id].entity_remove()
+            except KeyError:
+                pass
             except UnboundLocalError:
                 pass
             return
@@ -768,10 +820,10 @@ class LifeForm:
         Removes an entity from the board.
         :return:
         """
-        current_session.world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
+        world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
         self.alive = False
         current_session.last_removal = self.life_form_id
-        del LifeForm.lifeforms[self.life_form_id]
+        del BaseEntity.lifeforms[self.life_form_id]
         logger.debug(f"Entity {self.life_form_id} removed")
 
     def fade_entity(self):
@@ -779,19 +831,58 @@ class LifeForm:
         Fades an entity from the board using shaders from Pixel Composer.
         :return:
         """
-        current_session.world_space_access.write_to_world_space(
+        world_space_access.write_to_world_space(
             (self.matrix_position_x, self.matrix_position_y),
             (self.red_color, self.green_color,
              self.blue_color), self.life_form_id, 2)
         self.entity_remove()
 
 
+class Wall(BaseEntity):
+    def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand=0):
+        super().__init__(life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand)
+
+        self.wall_color_int = 127
+        self.wall_color_float = 0.5
+
+        self.wall = True
+        if not args.fixed_function:
+            self.red_color = self.wall_color_float
+        else:
+            self.red_color = self.wall_color_int
+
+        if not args.fixed_function:
+            self.green_color = self.wall_color_float
+        else:
+            self.green_color = self.wall_color_int
+
+        if not args.fixed_function:
+            self.blue_color = self.wall_color_float
+        else:
+            self.blue_color = self.wall_color_int
+
+        # write new position in the buffer
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+    def process(self):
+        pass
+
+
+class LifeForm(BaseEntity):
+    def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand=0):
+        super().__init__(life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand)
+
+
 class DrawObjects(ScreenDrawer):
 
-    def __init__(self, output_controller, buffer_refresh, session_info, exit_text):
+    def __init__(self, output_controller, buffer_refresh, session_info, world_space, exit_text):
         super().__init__(output_controller=output_controller,
                          buffer_refresh=buffer_refresh,
                          session_info=session_info,
+                         world_space=world_space,
                          exit_text=exit_text)
 
         self.frame_buffer_access = FrameBufferInit(self.session_info)
@@ -900,6 +991,10 @@ def on_press(key):
         decrease_max_radiation()
     if key == KeyCode(char='S'):
         show_currents_stats()
+    # if key == KeyCode(char='Q'):
+    #     save_space_time()
+    # if key == KeyCode(char='A'):
+    #     load_space_time()
 
 
 def global_board_generator():
@@ -943,8 +1038,10 @@ def thanos_snap():
     Remove half of the life forms from the board
     :return:
     """
-    for x in range(int(len(LifeForm.lifeforms.values()) / 2)):
-        vanished = random.choice((list(LifeForm.lifeforms.values())))
+    life_form_instances = [i for i in BaseEntity.lifeforms.values() if isinstance(i, LifeForm)]
+
+    for x in range(int(len(life_form_instances) / 2)):
+        vanished = random.choice(life_form_instances)
         try:
             LifeForm.lifeforms[vanished.life_form_id].fade_entity()
         except KeyError:
@@ -958,6 +1055,7 @@ def gravity_switch():
     :return:
     """
     current_session.gravity_on = not current_session.gravity_on
+    logger.info(f"Gravity is now {current_session.gravity_on}")
 
 
 def render_switch():
@@ -966,6 +1064,7 @@ def render_switch():
     :return:
     """
     current_session.rendering_on = not current_session.rendering_on
+    logger.info(f"Rendering is now {current_session.rendering_on}")
 
 
 def increase_max_radiation():
@@ -1002,9 +1101,61 @@ def show_currents_stats():
     logging.info(pretty_print_dataclass(current_session))
 
 
-def class_generator(life_form_id):
+def save_space_time():
+    world_space_access.world_space_time['save'] = current_session, BaseEntity.lifeforms.copy()
+    logger.info("Saved space time")
+
+
+def load_space_time():
+    # todo: WIP, needs fixing and finishing
+    # world_space_access.world_space_time[
+    #     world_space_access.world_time] = LifeForm.lifeforms.copy().values(), current_session
+
+    # current_session = world_space_access.world_space_time['save'][0]
+    # LifeForm.lifeforms = world_space_access.world_space_time['save'][1]
+    # print(current_session)
+    # print(world_space_access.world_space_time['save'][0])
+
+    # print(world_space_access.world_space_time['save'][0])
+
+    # current_session = world_space_access.world_space_time['save'][0]
+    # world_space_access.erase_world_space()
+
+    current_session.process_loop_on = False
+
+    current_session.highest_concurrent_lifeforms = world_space_access.world_space_time['save'][
+        0].highest_concurrent_lifeforms
+    current_session.max_enemy_factor = world_space_access.world_space_time['save'][0].max_enemy_factor
+    current_session.draw_trails = world_space_access.world_space_time['save'][0].draw_trails
+    current_session.radiation_change = world_space_access.world_space_time['save'][0].radiation_change
+    current_session.radiation = world_space_access.world_space_time['save'][0].radiation
+    current_session.radiation_base_change_chance = world_space_access.world_space_time['save'][
+        0].radiation_base_change_chance
+    current_session.dna_chaos_chance = world_space_access.world_space_time['save'][0].dna_chaos_chance
+    current_session.max_attribute = world_space_access.world_space_time['save'][0].max_attribute
+    current_session.radiation_max = world_space_access.world_space_time['save'][0].radiation_max
+    current_session.gravity_on = world_space_access.world_space_time['save'][0].gravity_on
+    current_session.rendering_on = world_space_access.world_space_time['save'][0].rendering_on
+    current_session.last_removal = world_space_access.world_space_time['save'][0].last_removal
+    current_session.current_life_form_amount = world_space_access.world_space_time['save'][0].current_life_form_amount
+    current_session.life_form_total_count = world_space_access.world_space_time['save'][0].life_form_total_count
+
+    print(len(BaseEntity.lifeforms))
+    print(len(world_space_access.world_space_time['save'][1]))
+    BaseEntity.lifeforms = {}
+    world_space_access.erase_world_space()
+    print(len(BaseEntity.lifeforms))
+    BaseEntity.lifeforms = world_space_access.world_space_time['save'][1]
+    logger.info("Loaded space time")
+    print(len(BaseEntity.lifeforms))
+
+    current_session.process_loop_on = True
+
+
+def class_generator(life_form_id, wall=False):
     """
     Generates a life form class based on the life form id.
+    :param wall:
     :param life_form_id:
     :return:
     """
@@ -1013,8 +1164,16 @@ def class_generator(life_form_id):
     except TypeError:
         return
 
-    LifeForm(life_form_id=life_form_id, seed=get_random(), seed2=get_random(), seed3=get_random(),
+    if wall:
+        Wall(life_form_id=current_session.life_form_total_count, seed=get_random(), seed2=get_random(),
+             seed3=get_random(),
              start_x=starting_x, start_y=starting_y)
+        current_session.life_form_total_count += 1
+    else:
+        LifeForm(life_form_id=current_session.life_form_total_count, seed=get_random(), seed2=get_random(),
+                 seed3=get_random(),
+                 start_x=starting_x, start_y=starting_y)
+        current_session.life_form_total_count += 1
 
 
 def main():
@@ -1031,11 +1190,12 @@ def main():
     current_session.max_movement = diagonal_distance(0, 0, screen_controller.u_width, screen_controller.u_height)
     next_frame = time() + frame_refresh_delay_ms
     while True:
+        # while current_session.process_loop_on:
         # if time() > next_frame or not refresh_logic_link and current_session.world_space_access.buffer_ready:
         # for now this just checks whether the next frame time is ready or whether refresh logic is disabled
         # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
         # but the display will always be behind resulting in entities looking like they are teleporting around
-        life_form_container = LifeForm.lifeforms.copy().values()
+        life_form_container = BaseEntity.lifeforms.copy().values()
         if time() > next_frame or not refresh_logic_link:
             # check the list of entities has items within
             if life_form_container:
@@ -1052,7 +1212,7 @@ def main():
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.last_removal = -1
                     current_session.get_coord_map()
-
+                    [class_generator(i, True) for i in range(args.wall_number)]
                     [class_generator(i) for i in range(args.life_form_total)]
 
                     current_session.rendering_on = True
@@ -1063,13 +1223,15 @@ def main():
                         f'\n All Lifeforms have expired.\n Total life forms produced: '
                         f'{current_session.life_form_total_count}\n '
                         f'Max concurrent Lifeforms was: {current_session.highest_concurrent_lifeforms}\n')
-                    current_session.world_space_access.erase_world_space()
+                    world_space_access.end_world_space()
                     quit()
 
             logger.debug(f"Lifeforms: {current_session.life_form_total_count}")
 
             if args.radiation_change:
                 current_session.adjust_radiation_along_curve()
+
+            world_space_access.world_time += 1
 
             next_frame = time() + frame_refresh_delay_ms
 
@@ -1106,20 +1268,24 @@ if __name__ == '__main__':
                         default=hat_simulator_or_panel_size,
                         help='Maximum possible time to move number for entities')
 
-    parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode",
+    parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode", default=combine_mode,
                         help='Enables life forms to combine into bigger ones')
 
-    parser.add_argument('-mc', '--minecraft-mode', action="store_true", dest="mc_mode",
-                        help='Enables Minecraft mode')
+    # parser.add_argument('-mc', '--minecraft-mode', action="store_true", dest="mc_mode",
+    #                     help='Enables Minecraft mode')
 
-    parser.add_argument('-tr', '--trails', action="store_true", dest="trails_on",
+    parser.add_argument('-tr', '--trails', action="store_true", dest="trails_on", default=trails_on,
                         help='Stops the HAT from being cleared, resulting in trails of entities')
 
-    parser.add_argument('-g', '--gravity', action="store_true", dest="gravity",
+    parser.add_argument('-g', '--gravity', action="store_true", dest="gravity", default=gravity_on,
                         help='Gravity enabled, still entities will fall to the floor')
 
-    parser.add_argument('-rc', '--radiation-change', action="store_true", dest="radiation_change",
+    parser.add_argument('-rc', '--radiation-change', action="store_true", dest="radiation_change", default=radiation_change,
                         help='Whether to adjust radiation levels across the simulation or not')
+
+    parser.add_argument('-w', '--walls', action="store", dest="wall_number", type=int,
+                        default=walls,
+                        help='Number of walls to randomly spawn that will block entities')
 
     parser.add_argument('-r', '--radiation', action="store", dest="radiation", type=int, default=initial_radiation,
                         help='Radiation enabled, will increase random mutation chance and damage entities')
@@ -1136,10 +1302,18 @@ if __name__ == '__main__':
                         default=change_of_base_radiation_chance,
                         help='The percentage chance that the base radiation level will change randomly.')
 
-    parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on",
+    parser.add_argument('-be', '--building-entities', action="store_true", dest="building_entities",
+                        default=entities_build_walls,
+                        help='Whether lifeforms can build static blocks on the board')
+
+    parser.add_argument('-wc', '--wall-chance', action="store", dest="wall_chance_multiplier", type=int,
+                        default=wall_chance_multiplier,
+                        help='Whether lifeforms can build static blocks on the board')
+
+    parser.add_argument('-rt', '--retry', action="store_true", dest="retry_on", default=retries_on,
                         help='Whether the loop will automatically restart upon the expiry of all entities')
 
-    parser.add_argument('-sim', '--unicorn-hat-sim', action="store_true", dest="simulator",
+    parser.add_argument('-sim', '--unicorn-hat-sim', action="store_true", dest="simulator", default=unicorn_simulator,
                         help='Whether to use the Unicorn HAT simulator or not')
 
     parser.add_argument('-hm', '--hat-model', action="store", dest="hat_edition", type=str, default=hat_model,
@@ -1150,7 +1324,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
 
-    parser.add_argument('-ff', '--fixed-function', action="store_true", dest="fixed_function",
+    parser.add_argument('-ff', '--fixed-function', action="store_true", dest="fixed_function", default=fixed_function,
                         help='Whether to bypass pixel composer and use fixed function '
                              'for drawing (faster, less pretty)')
 
@@ -1158,12 +1332,17 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=args.log_level)
 
-    screen_controller = ScreenController(screen_type=args.hat_edition, simulator=args.simulator,
+    world_space_access = WorldSpaceControl()
+
+    screen_controller = ScreenController(screen_type=args.hat_edition,
+                                         simulator=args.simulator,
                                          custom_size_simulator=args.custom_size_simulator,
                                          led_brightness=led_brightness)
 
     current_session = Session(life_form_total_count=args.life_form_total,
+                              building_entities=args.building_entities,
                               max_enemy_factor=args.max_enemy_factor,
+                              wall_chance_multiplier=args.wall_chance_multiplier,
                               draw_trails=args.trails_on,
                               retries=args.retry_on,
                               highest_concurrent_lifeforms=args.life_form_total,
@@ -1175,9 +1354,12 @@ if __name__ == '__main__':
                               max_attribute=args.max_num,
                               gravity_on=args.gravity)
 
+    [class_generator(i, True) for i in range(args.wall_number)]
     [class_generator(i) for i in range(args.life_form_total)]
 
     current_session.rendering_on = True
+
+    print(current_session.building_entities)
 
     listener = Listener(on_press=on_press, daemon=True)
     listener.start()
@@ -1188,6 +1370,7 @@ if __name__ == '__main__':
         draw_control = DrawObjects(output_controller=screen_controller,
                                    buffer_refresh=hat_buffer_refresh_rate,
                                    session_info=current_session,
+                                   world_space=world_space_access,
                                    exit_text='Program ended by user.\n Total life forms produced: ${'
                                              'life_form_total_count}\n Max'
                                              'concurrent Lifeforms was: ${highest_concurrent_lifeforms}\n Last count '
@@ -1198,5 +1381,5 @@ if __name__ == '__main__':
             [screen_controller.draw_pixels(coord, (0, 0, 0)) for coord in
              current_session.coord_map]
             [screen_controller.draw_pixels(coord, pixel[0]) for coord, pixel in
-             current_session.world_space_access.world_space.copy().items()]
+             world_space_access.world_space.copy().items()]
             screen_controller.show()
