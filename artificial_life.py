@@ -440,44 +440,6 @@ class BaseEntity:
                 self.entity_remove()
                 return
 
-            self.best_coord_memory = self.get_highest_coord_good_memory()
-
-            if self.best_coord_memory:
-                if self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y < \
-                        self.best_coord_memory[1]:
-                    self.matrix_position_x += 1
-                    self.matrix_position_y += 1
-                    self.direction = 'move_up_and_right'
-                elif self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y > \
-                        self.best_coord_memory[1]:
-                    self.matrix_position_x += 1
-                    self.matrix_position_y -= 1
-                    self.direction = 'move_down_and_right'
-                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y < \
-                        self.best_coord_memory[1]:
-                    self.matrix_position_x -= 1
-                    self.matrix_position_y += 1
-                    self.direction = 'move_up_and_left'
-                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y > \
-                        self.best_coord_memory[1]:
-                    self.matrix_position_x -= 1
-                    self.matrix_position_y -= 1
-                    self.direction = 'move_down_and_left'
-                elif self.matrix_position_x < self.best_coord_memory[0]:
-                    self.matrix_position_x += 1
-                    self.direction = 'move_right'
-                elif self.matrix_position_x > self.best_coord_memory[0]:
-                    self.matrix_position_x -= 1
-                    self.direction = 'move_left'
-                elif self.matrix_position_y < self.best_coord_memory[1]:
-                    self.matrix_position_y += 1
-                    self.direction = 'move_up'
-                elif self.matrix_position_y > self.best_coord_memory[1]:
-                    self.matrix_position_y -= 1
-                    self.direction = 'move_down'
-                else:
-                    self.direction = self.preferred_direction
-
             if not self.waiting_to_build and current_session.building_entities:
                 if self.time_to_build_count > 0:
                     self.time_to_build_count -= 1
@@ -912,6 +874,44 @@ class BaseEntity:
                     logger.debug(f"Max life form limit: {args.pop_limit} reached")
                     self.waiting_to_spawn = True
                     self.waiting_to_build = True
+
+            self.best_coord_memory = self.get_highest_coord_good_memory()
+
+            if self.best_coord_memory:
+                if self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y < \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x += 1
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up_and_right'
+                elif self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y > \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x += 1
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down_and_right'
+                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y < \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x -= 1
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up_and_left'
+                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y > \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x -= 1
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down_and_left'
+                elif self.matrix_position_x < self.best_coord_memory[0]:
+                    self.matrix_position_x += 1
+                    self.direction = 'move_right'
+                elif self.matrix_position_x > self.best_coord_memory[0]:
+                    self.matrix_position_x -= 1
+                    self.direction = 'move_left'
+                elif self.matrix_position_y < self.best_coord_memory[1]:
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up'
+                elif self.matrix_position_y > self.best_coord_memory[1]:
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down'
+                else:
+                    self.direction = self.preferred_direction
 
             if self.strength < self.weight:
                 self.direction = 'still'
