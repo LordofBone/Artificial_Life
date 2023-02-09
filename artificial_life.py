@@ -29,11 +29,6 @@ from config.parameters import *
 logger = logging.getLogger("alife-logger")
 
 
-def pretty_print_dataclass(dataclass_object):
-    """Prints a pretty formatted version of a dataclass object."""
-    return json.dumps(asdict(dataclass_object), indent=4)
-
-
 def diagonal_distance(x1, y1, x2, y2):
     """
     Calculates the diagonal distance between two points
@@ -326,6 +321,8 @@ class BaseEntity:
         else:
             self.time_to_build = floor(self.max_attribute * random.random())
 
+        # todo: add in wall strength based on entities own strength
+
         self.time_to_build_count = self.time_to_build
 
         # reset the global random seed
@@ -561,7 +558,7 @@ class BaseEntity:
 
                                     self.direction = self.previous_direction
 
-                                    collision_check = True
+                                    collision_check = False
 
                                 # if the other entities' aggression factor is higher it will be killed the current entity
                                 # it will be removed from the main loops list of entities
@@ -596,7 +593,7 @@ class BaseEntity:
 
                                         self.direction = self.previous_direction
 
-                                        collision_check = True
+                                        collision_check = False
                             else:
                                 logger.debug('Other entity killed')
                                 self.time_to_live_count += BaseEntity.lifeforms[
@@ -606,7 +603,17 @@ class BaseEntity:
 
                                 self.direction = self.previous_direction
 
-                                collision_check = True
+                                collision_check = False
+
+                    # todo: add in extra calculations for taking momentum and weight into account here
+                    elif BaseEntity.lifeforms[collided_life_form_id].wall:
+                        if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength:
+                            logger.debug('Entity broke down wall')
+                            BaseEntity.lifeforms[collided_life_form_id].entity_remove()
+                            collision_check = False
+                        else:
+                            logger.debug('Entity hit wall')
+                            collision_check = True
 
                 collision_check = True
             else:
@@ -990,7 +997,7 @@ def on_press(key):
     if key == KeyCode(char='r'):
         decrease_max_radiation()
     if key == KeyCode(char='S'):
-        show_currents_stats()
+        show_current_session_stats()
     # if key == KeyCode(char='Q'):
     #     save_space_time()
     # if key == KeyCode(char='A'):
@@ -1093,12 +1100,32 @@ def decrease_max_radiation():
         logger.info(f"Radiation level decreased to {current_session.radiation}")
 
 
-def show_currents_stats():
+def show_current_session_stats():
     """
     Show the current stats of the session
     :return:
     """
-    logging.info(pretty_print_dataclass(current_session))
+    logging.info("Current session stats:")
+    logging.info(f"Highest concurrent lifeforms: {current_session.highest_concurrent_lifeforms}")
+    logging.info(f"Built entities: {current_session.building_entities}")
+    logging.info(f"Max friend factor: {current_session.max_enemy_factor}")
+    logging.info(f"Wall chance multiplier: {current_session.wall_chance_multiplier}")
+    logging.info(f"Drawing trails: {current_session.draw_trails}")
+    logging.info(f"Retries enabled: {current_session.retries}")
+    logging.info(f"Radiation change enabled: {current_session.radiation_change}")
+    logging.info(f"Current Radiation: {current_session.radiation}")
+    logging.info(f"Radiation curve: {current_session.radiation_curve}")
+    logging.info(f"Radiation base change chance: {current_session.radiation_base_change_chance}")
+    logging.info(f"DNA chaos chance: {current_session.dna_chaos_chance}")
+    logging.info(f"Max attribute: {current_session.max_attribute}")
+    logging.info(f"Max radiation: {current_session.radiation_max}")
+    logging.info(f"Gravity enabled: {current_session.gravity_on}")
+    logging.info(f"Rendering enabled: {current_session.rendering_on}")
+    logging.info(f"Max movement: {current_session.max_movement}")
+    logging.info(f"Last removal: {current_session.last_removal}")
+    logging.info(f"Current life form amount: {current_session.current_life_form_amount}")
+    logging.info(f"Life form total count: {current_session.life_form_total_count}")
+    logging.info(f"Process loop on: {current_session.process_loop_on}\n")
 
 
 def save_space_time():
@@ -1196,7 +1223,7 @@ def main():
         # this allows the internal logic to operate faster than the refresh rate of the display, so it will run faster
         # but the display will always be behind resulting in entities looking like they are teleporting around
         life_form_container = BaseEntity.lifeforms.copy().values()
-        if time() > next_frame or not refresh_logic_link:
+        if time() > next_frame or not args.logic_sync:
             # check the list of entities has items within
             if life_form_container:
                 [life_form.process() for life_form in life_form_container]
@@ -1280,7 +1307,8 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gravity', action="store_true", dest="gravity", default=gravity_on,
                         help='Gravity enabled, still entities will fall to the floor')
 
-    parser.add_argument('-rc', '--radiation-change', action="store_true", dest="radiation_change", default=radiation_change,
+    parser.add_argument('-rc', '--radiation-change', action="store_true", dest="radiation_change",
+                        default=radiation_change,
                         help='Whether to adjust radiation levels across the simulation or not')
 
     parser.add_argument('-w', '--walls', action="store", dest="wall_number", type=int,
@@ -1324,6 +1352,9 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--log-level', action="store", dest="log_level", type=str, default=logging_level,
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'NOTSET'], help='Logging level')
 
+    parser.add_argument('-sl', '--sync-logic', action="store_true", dest="logic_sync", default=refresh_logic_link,
+                        help='Whether to sync the logic loop to the refresh rate of the screen')
+
     parser.add_argument('-ff', '--fixed-function', action="store_true", dest="fixed_function", default=fixed_function,
                         help='Whether to bypass pixel composer and use fixed function '
                              'for drawing (faster, less pretty)')
@@ -1358,8 +1389,6 @@ if __name__ == '__main__':
     [class_generator(i) for i in range(args.life_form_total)]
 
     current_session.rendering_on = True
-
-    print(current_session.building_entities)
 
     listener = Listener(on_press=on_press, daemon=True)
     listener.start()
