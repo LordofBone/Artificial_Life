@@ -613,7 +613,9 @@ class BaseEntity:
 
                     # todo: add in extra calculations for taking momentum and weight into account here
                     elif BaseEntity.lifeforms[collided_life_form_id].wall:
-                        if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength:
+                        if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength \
+                                and self.aggression_factor \
+                                > BaseEntity.lifeforms[collided_life_form_id].aggression_factor:
                             logger.debug('Entity broke down wall')
                             if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
                                 collision_check = False
