@@ -611,11 +611,10 @@ class BaseEntity:
 
                                 self.direction = self.previous_direction
 
-                    # todo: add in extra calculations for taking momentum and weight into account here
+                    # todo: add in extra calculations for taking momentum and weight into account here?
                     elif BaseEntity.lifeforms[collided_life_form_id].wall:
                         if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength \
-                                and self.aggression_factor \
-                                > BaseEntity.lifeforms[collided_life_form_id].aggression_factor:
+                                and self.aggression_factor < self.breed_threshold:
                             logger.debug('Entity broke down wall')
                             if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
                                 collision_check = False
@@ -787,6 +786,8 @@ class BaseEntity:
                             self.waiting_to_build = False
 
                     elif self.waiting_to_spawn:
+                        if self.wall:
+                            raise Exception("Wall life form is trying to spawn a life form")
                         if post_x_gen is not None and post_y_gen is not None:
                             # increase the life form total by 1
                             current_session.life_form_total_count += 1
@@ -882,6 +883,7 @@ class Wall(BaseEntity):
              self.blue_color), self.life_form_id)
 
     def process(self):
+        # todo: add in the possibility for radiation to cause a wall to turn into a life form
         pass
 
 
