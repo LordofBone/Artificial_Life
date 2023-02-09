@@ -252,6 +252,10 @@ class BaseEntity:
         self.wall = False
 
         self.material = 0
+        # todo: add in a 'memory' system where the life form can remember where something good occured ie. breeding
+        #  event, mining event etc.
+        self.good_memories = {}
+        self.bad_memories = {}
 
         self.waiting_to_spawn = False
         self.waiting_to_build = False
@@ -373,6 +377,27 @@ class BaseEntity:
                 else:
                     return BaseEntity.lifeforms[collided_life_form_id].life_seed3
 
+    def add_coord_good_memory(self, x, y):
+        if (x, y) in self.good_memories:
+            self.good_memories[(x, y)] += 1
+        else:
+            self.good_memories[(x, y)] = 1
+
+    def get_count_good_memory(self, x, y):
+        if (x, y) in self.good_memories:
+            return self.good_memories[(x, y)]
+        else:
+            return 0
+
+    def get_highest_coord_good_memory(self):
+        highest_coord = None
+        highest_count = 0
+        for coord, count in self.good_memories.items():
+            if count > highest_count:
+                highest_coord = coord
+                highest_count = count
+        return highest_coord
+
     def get_stats(self):
         """
         This method is used to get the stats of the life form
@@ -414,6 +439,44 @@ class BaseEntity:
             if expired:
                 self.entity_remove()
                 return
+
+            self.best_coord_memory = self.get_highest_coord_good_memory()
+
+            if self.best_coord_memory:
+                if self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y < \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x += 1
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up_and_right'
+                elif self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y > \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x += 1
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down_and_right'
+                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y < \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x -= 1
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up_and_left'
+                elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y > \
+                        self.best_coord_memory[1]:
+                    self.matrix_position_x -= 1
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down_and_left'
+                elif self.matrix_position_x < self.best_coord_memory[0]:
+                    self.matrix_position_x += 1
+                    self.direction = 'move_right'
+                elif self.matrix_position_x > self.best_coord_memory[0]:
+                    self.matrix_position_x -= 1
+                    self.direction = 'move_left'
+                elif self.matrix_position_y < self.best_coord_memory[1]:
+                    self.matrix_position_y += 1
+                    self.direction = 'move_up'
+                elif self.matrix_position_y > self.best_coord_memory[1]:
+                    self.matrix_position_y -= 1
+                    self.direction = 'move_down'
+                else:
+                    self.direction = self.preferred_direction
 
             if not self.waiting_to_build and current_session.building_entities:
                 if self.time_to_build_count > 0:
@@ -502,8 +565,8 @@ class BaseEntity:
 
                 logger.debug(f'Collision detected: {self.life_form_id} collided with {collided_life_form_id}')
 
-                # store the current direction for later use, like if the life form kills another, it will continue moving
-                # in that direction rather than bounce
+                # store the current direction for later use, like if the life form kills another, it will continue
+                # moving in that direction rather than bounce
                 self.previous_direction = self.direction
 
                 if not self.direction == self.preferred_direction:
@@ -523,7 +586,10 @@ class BaseEntity:
 
                             if self.compatibility_factor + self.combine_threshold > \
                                     BaseEntity.lifeforms[
-                                        collided_life_form_id].compatibility_factor > self.compatibility_factor - self.combine_threshold:
+                                        collided_life_form_id].compatibility_factor \
+                                    > self.compatibility_factor - self.combine_threshold:
+                                self.add_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
+
                                 if args.combine_mode:
                                     logger.debug(f'Entity: {self.life_form_id} combined with: {collided_life_form_id}')
 
@@ -637,7 +703,7 @@ class BaseEntity:
                         if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength \
                                 and self.aggression_factor < self.breed_threshold:
                             logger.debug('Entity broke down wall')
-
+                            self.add_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
                             if BaseEntity.lifeforms[collided_life_form_id].material > 10 \
                                     and BaseEntity.lifeforms[collided_life_form_id].material >= self.mining_strength:
                                 BaseEntity.lifeforms[collided_life_form_id].material -= self.mining_strength
