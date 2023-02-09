@@ -487,6 +487,8 @@ class BaseEntity:
             # get the count of total life forms currently active
             # if there has been a collision with another entity it will attempt to interact with the other entity
             if collision_detected:
+                collision_check = True
+
                 if self.bouncy:
                     momentum_reduction = percentage(10, self.momentum)
                     self.momentum -= momentum_reduction
@@ -543,8 +545,8 @@ class BaseEntity:
                             if not BaseEntity.lifeforms[collided_life_form_id].aggression_factor < \
                                    BaseEntity.lifeforms[collided_life_form_id].breed_threshold:
 
-                                # if the other entities' aggression factor is lower it will be killed and removed from the
-                                # main loops list of entities
+                                # if the other entities' aggression factor is lower it will be killed and removed
+                                # from the main loops list of entities
 
                                 if BaseEntity.lifeforms[collided_life_form_id].strength < self.strength:
                                     logger.debug('Other entity killed')
@@ -554,14 +556,15 @@ class BaseEntity:
                                     self.weight += BaseEntity.lifeforms[collided_life_form_id].weight
                                     self.strength += BaseEntity.lifeforms[collided_life_form_id].strength
 
+                                    if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
+                                        collision_check = False
+
                                     BaseEntity.lifeforms[collided_life_form_id].entity_remove()
 
                                     self.direction = self.previous_direction
 
-                                    collision_check = False
-
-                                # if the other entities' aggression factor is higher it will be killed the current entity
-                                # it will be removed from the main loops list of entities
+                                # if the other entities' aggression factor is higher it will be killed the current
+                                # entity it will be removed from the main loops list of entities
                                 elif BaseEntity.lifeforms[collided_life_form_id].strength > self.strength:
                                     logger.debug('Current entity killed')
 
@@ -589,33 +592,35 @@ class BaseEntity:
                                         self.time_to_live_count += BaseEntity.lifeforms[
                                             collided_life_form_id].time_to_live_count
 
+                                        if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
+                                            collision_check = False
+
                                         BaseEntity.lifeforms[collided_life_form_id].entity_remove()
 
                                         self.direction = self.previous_direction
 
-                                        collision_check = False
                             else:
                                 logger.debug('Other entity killed')
                                 self.time_to_live_count += BaseEntity.lifeforms[
                                     collided_life_form_id].time_to_live_count
 
+                                if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
+                                    collision_check = False
+
                                 BaseEntity.lifeforms[collided_life_form_id].entity_remove()
 
                                 self.direction = self.previous_direction
-
-                                collision_check = False
 
                     # todo: add in extra calculations for taking momentum and weight into account here
                     elif BaseEntity.lifeforms[collided_life_form_id].wall:
                         if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength:
                             logger.debug('Entity broke down wall')
+                            if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
+                                collision_check = False
                             BaseEntity.lifeforms[collided_life_form_id].entity_remove()
-                            collision_check = False
                         else:
                             logger.debug('Entity hit wall')
                             collision_check = True
-
-                collision_check = True
             else:
                 collision_check = False
 
