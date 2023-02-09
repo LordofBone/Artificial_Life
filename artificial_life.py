@@ -251,6 +251,8 @@ class BaseEntity:
 
         self.wall = False
 
+        self.material = 0
+
         self.waiting_to_spawn = False
         self.waiting_to_build = False
 
@@ -327,6 +329,8 @@ class BaseEntity:
 
         # reset the global random seed
         random.seed()
+
+        self.mining_strength = percentage(self.strength, 1)
 
         # set the starting location of the life form from the x and y positions
         self.matrix_position_x = start_x
@@ -553,6 +557,9 @@ class BaseEntity:
 
                                     self.time_to_live_count += BaseEntity.lifeforms[
                                         collided_life_form_id].time_to_live_count
+
+                                    self.material += BaseEntity.lifeforms[collided_life_form_id].material
+                                    self.weight += BaseEntity.lifeforms[collided_life_form_id].material
                                     self.weight += BaseEntity.lifeforms[collided_life_form_id].weight
                                     self.strength += BaseEntity.lifeforms[collided_life_form_id].strength
 
@@ -570,6 +577,8 @@ class BaseEntity:
 
                                     BaseEntity.lifeforms[
                                         collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                    BaseEntity.lifeforms[collided_life_form_id].material += self.material
+                                    BaseEntity.lifeforms[collided_life_form_id].weight += self.material
                                     BaseEntity.lifeforms[collided_life_form_id].weight += self.weight
                                     BaseEntity.lifeforms[collided_life_form_id].strength += self.strength
 
@@ -582,6 +591,8 @@ class BaseEntity:
                                         logger.debug('Current entity killed')
                                         BaseEntity.lifeforms[
                                             collided_life_form_id].time_to_live_count += self.time_to_live_count
+                                        BaseEntity.lifeforms[collided_life_form_id].material += self.material
+                                        BaseEntity.lifeforms[collided_life_form_id].weight += self.material
                                         BaseEntity.lifeforms[collided_life_form_id].weight += self.weight
                                         BaseEntity.lifeforms[collided_life_form_id].strength += self.strength
 
@@ -591,6 +602,11 @@ class BaseEntity:
                                         logger.debug('Other entity killed')
                                         self.time_to_live_count += BaseEntity.lifeforms[
                                             collided_life_form_id].time_to_live_count
+
+                                        self.material += BaseEntity.lifeforms[collided_life_form_id].material
+                                        self.weight += BaseEntity.lifeforms[collided_life_form_id].material
+                                        self.weight += BaseEntity.lifeforms[collided_life_form_id].weight
+                                        self.strength += BaseEntity.lifeforms[collided_life_form_id].strength
 
                                         if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
                                             collision_check = False
@@ -604,6 +620,11 @@ class BaseEntity:
                                 self.time_to_live_count += BaseEntity.lifeforms[
                                     collided_life_form_id].time_to_live_count
 
+                                self.material += BaseEntity.lifeforms[collided_life_form_id].material
+                                self.weight += BaseEntity.lifeforms[collided_life_form_id].material
+                                self.weight += BaseEntity.lifeforms[collided_life_form_id].weight
+                                self.strength += BaseEntity.lifeforms[collided_life_form_id].strength
+
                                 if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
                                     collision_check = False
 
@@ -616,9 +637,20 @@ class BaseEntity:
                         if self.strength > BaseEntity.lifeforms[collided_life_form_id].strength \
                                 and self.aggression_factor < self.breed_threshold:
                             logger.debug('Entity broke down wall')
-                            if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
-                                collision_check = False
-                            BaseEntity.lifeforms[collided_life_form_id].entity_remove()
+
+                            if BaseEntity.lifeforms[collided_life_form_id].material > 10 \
+                                    and BaseEntity.lifeforms[collided_life_form_id].material >= self.mining_strength:
+                                BaseEntity.lifeforms[collided_life_form_id].material -= self.mining_strength
+                                BaseEntity.lifeforms[collided_life_form_id].weight -= self.mining_strength
+                                self.material += self.mining_strength
+                                self.weight += self.mining_strength
+                                collision_check = True
+                            else:
+                                self.material += BaseEntity.lifeforms[collided_life_form_id].material
+                                self.weight += BaseEntity.lifeforms[collided_life_form_id].material
+                                if self.momentum > BaseEntity.lifeforms[collided_life_form_id].momentum:
+                                    collision_check = False
+                                BaseEntity.lifeforms[collided_life_form_id].entity_remove()
                         else:
                             logger.debug('Entity hit wall')
                             collision_check = True
@@ -768,10 +800,7 @@ class BaseEntity:
                         self.waiting_to_spawn = True
 
                     if not self.waiting_to_spawn and self.waiting_to_build:
-                        if post_x_gen is not None and post_y_gen is not None:
-                            # increase the life form total by 1
-                            current_session.life_form_total_count += 1
-
+                        if post_x_gen is not None and post_y_gen is not None and self.material >= 10:
                             Wall(
                                 life_form_id=current_session.life_form_total_count,
                                 seed=self.waiting_seed1,
@@ -781,6 +810,12 @@ class BaseEntity:
                                 start_y=post_y_gen,
                                 max_attrib_expand=self.waiting_max_attrib_expand)
 
+                            # increase the life form total by 1
+                            current_session.life_form_total_count += 1
+
+                            self.material -= 10
+                            self.weight -= 10
+
                             logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
                             self.waiting_to_build = False
@@ -789,9 +824,6 @@ class BaseEntity:
                         if self.wall:
                             raise Exception("Wall life form is trying to spawn a life form")
                         if post_x_gen is not None and post_y_gen is not None:
-                            # increase the life form total by 1
-                            current_session.life_form_total_count += 1
-
                             LifeForm(
                                 life_form_id=current_session.life_form_total_count,
                                 seed=self.waiting_seed1,
@@ -800,6 +832,9 @@ class BaseEntity:
                                 start_x=post_x_gen,
                                 start_y=post_y_gen,
                                 max_attrib_expand=self.waiting_max_attrib_expand)
+
+                            # increase the life form total by 1
+                            current_session.life_form_total_count += 1
 
                             logger.debug(f"Generated X, Y positions for new life form: {post_x_gen}, {post_y_gen}")
 
@@ -861,6 +896,9 @@ class Wall(BaseEntity):
         self.wall_color_float = 0.5
 
         self.wall = True
+
+        self.material = 10
+
         if not args.fixed_function:
             self.red_color = self.wall_color_float
         else:
@@ -879,6 +917,60 @@ class Wall(BaseEntity):
         # write new position in the buffer
         world_space_access.write_to_world_space(
             (self.matrix_position_x, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+    def process(self):
+        # todo: add in the possibility for radiation to cause a wall to turn into a life form
+        pass
+
+
+class Resource(BaseEntity):
+    def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand=0):
+        super().__init__(life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand)
+
+        self.wall = True
+
+        self.material = floor(self.max_attribute * random.random())
+
+        if not args.fixed_function:
+            self.red_color = 0.95
+        else:
+            self.red_color = 243
+
+        if not args.fixed_function:
+            self.green_color = 0.0
+        else:
+            self.green_color = 0
+
+        if not args.fixed_function:
+            self.blue_color = 0.0
+        else:
+            self.blue_color = 0
+
+        # write new position in the buffer
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x + 1, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y + 1),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x - 1, self.matrix_position_y),
+            (self.red_color, self.green_color,
+             self.blue_color), self.life_form_id)
+
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y - 1),
             (self.red_color, self.green_color,
              self.blue_color), self.life_form_id)
 
@@ -1188,9 +1280,10 @@ def load_space_time():
     current_session.process_loop_on = True
 
 
-def class_generator(life_form_id, wall=False):
+def class_generator(life_form_id, entity="lifeform"):
     """
     Generates a life form class based on the life form id.
+    :param entity:
     :param wall:
     :param life_form_id:
     :return:
@@ -1200,13 +1293,18 @@ def class_generator(life_form_id, wall=False):
     except TypeError:
         return
 
-    if wall:
+    if entity == "wall":
         Wall(life_form_id=current_session.life_form_total_count, seed=get_random(), seed2=get_random(),
              seed3=get_random(),
              start_x=starting_x, start_y=starting_y)
         current_session.life_form_total_count += 1
-    else:
+    elif entity == "lifeform":
         LifeForm(life_form_id=current_session.life_form_total_count, seed=get_random(), seed2=get_random(),
+                 seed3=get_random(),
+                 start_x=starting_x, start_y=starting_y)
+        current_session.life_form_total_count += 1
+    elif entity == "resource":
+        Resource(life_form_id=current_session.life_form_total_count, seed=get_random(), seed2=get_random(),
                  seed3=get_random(),
                  start_x=starting_x, start_y=starting_y)
         current_session.life_form_total_count += 1
@@ -1248,7 +1346,7 @@ def main():
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.last_removal = -1
                     current_session.get_coord_map()
-                    [class_generator(i, True) for i in range(args.wall_number)]
+                    [class_generator(i, "wall") for i in range(args.wall_number)]
                     [class_generator(i) for i in range(args.life_form_total)]
 
                     current_session.rendering_on = True
@@ -1324,6 +1422,10 @@ if __name__ == '__main__':
                         default=walls,
                         help='Number of walls to randomly spawn that will block entities')
 
+    parser.add_argument('-rs', '--resources', action="store", dest="resources_number", type=int,
+                        default=resources,
+                        help='Number of resources to begin with that entities can mine')
+
     parser.add_argument('-r', '--radiation', action="store", dest="radiation", type=int, default=initial_radiation,
                         help='Radiation enabled, will increase random mutation chance and damage entities')
 
@@ -1394,7 +1496,8 @@ if __name__ == '__main__':
                               max_attribute=args.max_num,
                               gravity_on=args.gravity)
 
-    [class_generator(i, True) for i in range(args.wall_number)]
+    [class_generator(i, "resource") for i in range(args.resources_number)]
+    [class_generator(i, "wall") for i in range(args.wall_number)]
     [class_generator(i) for i in range(args.life_form_total)]
 
     current_session.rendering_on = True

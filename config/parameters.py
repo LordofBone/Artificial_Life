@@ -21,5 +21,6 @@ gravity_on = False
 trails_on = False
 combine_mode = True
 walls = 0
+resources = 0
 entities_build_walls = True
 wall_chance_multiplier = 512
