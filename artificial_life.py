@@ -871,6 +871,11 @@ class BaseEntity:
                                 start_y=post_y_gen,
                                 max_attrib_expand=self.waiting_max_attrib_expand)
 
+                            BaseEntity.lifeforms[
+                                current_session.life_form_total_count].good_memories = self.good_memories
+                            BaseEntity.lifeforms[
+                                current_session.life_form_total_count].bad_memories = self.bad_memories
+
                             # increase the life form total by 1
                             current_session.life_form_total_count += 1
 
