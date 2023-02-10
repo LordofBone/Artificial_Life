@@ -290,6 +290,7 @@ class BaseEntity:
         self.weight = floor(self.max_attribute * random.random())
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
         self.momentum = floor(current_session.max_movement * random.random())
+        self.rebel = random.choice([True, False])
 
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
@@ -335,6 +336,10 @@ class BaseEntity:
         random.seed()
 
         self.mining_strength = percentage(self.strength, 1)
+
+        if self.rebel:
+            self.good_memories = {}
+            self.bad_memories = {}
 
         # set the starting location of the life form from the x and y positions
         self.matrix_position_x = start_x
