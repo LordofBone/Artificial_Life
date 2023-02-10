@@ -935,7 +935,7 @@ class BaseEntity:
                     elif self.matrix_position_y < self.best_coord_memory[1]:
                         self.direction = 'move_down'
                     else:
-                        # self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
+                        self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
                         self.direction = self.preferred_direction
 
             if self.strength < self.weight:
