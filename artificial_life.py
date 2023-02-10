@@ -291,6 +291,7 @@ class BaseEntity:
         self.preferred_breed_direction = random.choice(current_session.surrounding_point_choices)
         self.momentum = floor(current_session.max_movement * random.random())
         self.rebel = random.choice([True, False])
+        self.forgetfulness = floor(128 * random.random())
 
         # life seed 2 controls the random number generation for the green colour, aggression factor between 0 and the
         # maximum from above as well as the time the entity takes to change direction
@@ -309,6 +310,11 @@ class BaseEntity:
         self.bouncy = random.choice([True, False])
         self.builder = random.choice([True, False])
         self.wall_factor = floor(current_session.wall_chance_multiplier * random.random())
+        if not self.forgetfulness == 0:
+            self.memory_max = floor(self.max_attribute * random.random()) / self.forgetfulness
+        else:
+            self.memory_max = floor(self.max_attribute * random.random())
+        self.memory_max_count = self.memory_max
 
         # life seed 3 controls the random number generation for the green colour, and time to live between 0 and the
         # maximum from above
@@ -384,8 +390,8 @@ class BaseEntity:
 
     def add_coord_good_memory(self, x, y):
         if (x, y) in self.good_memories:
-            if self.good_memories[(x, y)] >= 10:
-                return False
+            # if self.good_memories[(x, y)] >= 10:
+            #     return False
             self.good_memories[(x, y)] += 1
         else:
             self.good_memories[(x, y)] = 1
@@ -450,6 +456,13 @@ class BaseEntity:
                 expired = False
             elif self.time_to_live_count <= 0:
                 expired = True
+
+            if self.memory_max_count > 0:
+                self.memory_max_count -= 1
+            elif self.memory_max_count <= 0:
+                self.memory_max_count = self.memory_max
+                self.good_memories = {}
+                self.bad_memories = {}
 
             if expired:
                 self.entity_remove()
@@ -922,7 +935,7 @@ class BaseEntity:
                     elif self.matrix_position_y < self.best_coord_memory[1]:
                         self.direction = 'move_down'
                     else:
-                        self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
+                        # self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
                         self.direction = self.preferred_direction
 
             if self.strength < self.weight:
