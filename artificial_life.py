@@ -886,57 +886,58 @@ class BaseEntity:
                     self.waiting_to_spawn = True
                     self.waiting_to_build = True
 
-            # minus 1 from the time to move count until it hits 0, at which point the entity will change
-            # direction from the "randomise direction" function being called
-            if not self.linked_up:
-                if self.time_to_move_count > 0:
-                    self.time_to_move_count -= 1
-                elif self.time_to_move_count <= 0:
-                    self.time_to_move_count = self.time_to_move
-                    if not self.direction == self.preferred_direction:
-                        self.direction = self.preferred_direction
-                    else:
-                        self.direction = random.choice(current_session.directions)
-            else:
-                # if combining is enabled set to the direction of the linked entity, however the other entity may
-                # have expired and weird things happen, and it may not be accessible from within the class holder
-                # so just randomise direction and de-link
-                try:
-                    self.direction = BaseEntity.lifeforms[self.linked_to].direction
-                except KeyError:
-                    self.linked_up = False
-                    if not self.direction == self.preferred_direction:
-                        self.direction = self.preferred_direction
-                    else:
-                        self.direction = random.choice(current_session.directions)
+            if not collision_check:
 
-            if not self.linked_up:
-                self.best_coord_memory = self.get_highest_coord_good_memory()
+                # minus 1 from the time to move count until it hits 0, at which point the entity will change
+                # direction from the "randomise direction" function being called
+                if not self.linked_up:
+                    self.best_coord_memory = self.get_highest_coord_good_memory()
 
-                if self.best_coord_memory:
-                    if self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y > \
-                            self.best_coord_memory[1]:
-                        self.direction = 'move_up_and_right'
-                    elif self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y < \
-                            self.best_coord_memory[1]:
-                        self.direction = 'move_down_and_right'
-                    elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y > \
-                            self.best_coord_memory[1]:
-                        self.direction = 'move_up_and_left'
-                    elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y < \
-                            self.best_coord_memory[1]:
-                        self.direction = 'move_down_and_left'
-                    elif self.matrix_position_x < self.best_coord_memory[0]:
-                        self.direction = 'move_right'
-                    elif self.matrix_position_x > self.best_coord_memory[0]:
-                        self.direction = 'move_left'
-                    elif self.matrix_position_y > self.best_coord_memory[1]:
-                        self.direction = 'move_up'
-                    elif self.matrix_position_y < self.best_coord_memory[1]:
-                        self.direction = 'move_down'
+                    if self.best_coord_memory:
+                        if self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y > \
+                                self.best_coord_memory[1]:
+                            self.direction = 'move_up_and_right'
+                        elif self.matrix_position_x < self.best_coord_memory[0] and self.matrix_position_y < \
+                                self.best_coord_memory[1]:
+                            self.direction = 'move_down_and_right'
+                        elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y > \
+                                self.best_coord_memory[1]:
+                            self.direction = 'move_up_and_left'
+                        elif self.matrix_position_x > self.best_coord_memory[0] and self.matrix_position_y < \
+                                self.best_coord_memory[1]:
+                            self.direction = 'move_down_and_left'
+                        elif self.matrix_position_x < self.best_coord_memory[0]:
+                            self.direction = 'move_right'
+                        elif self.matrix_position_x > self.best_coord_memory[0]:
+                            self.direction = 'move_left'
+                        elif self.matrix_position_y > self.best_coord_memory[1]:
+                            self.direction = 'move_up'
+                        elif self.matrix_position_y < self.best_coord_memory[1]:
+                            self.direction = 'move_down'
+                        else:
+                            self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
+                            self.direction = self.preferred_direction
                     else:
-                        self.remove_coord_good_memory(self.matrix_position_x, self.matrix_position_y)
-                        self.direction = self.preferred_direction
+                        if self.time_to_move_count > 0:
+                            self.time_to_move_count -= 1
+                        elif self.time_to_move_count <= 0:
+                            self.time_to_move_count = self.time_to_move
+                            if not self.direction == self.preferred_direction:
+                                self.direction = self.preferred_direction
+                            else:
+                                self.direction = random.choice(current_session.directions)
+                else:
+                    # if combining is enabled set to the direction of the linked entity, however the other entity may
+                    # have expired and weird things happen, and it may not be accessible from within the class holder
+                    # so just randomise direction and de-link
+                    try:
+                        self.direction = BaseEntity.lifeforms[self.linked_to].direction
+                    except KeyError:
+                        self.linked_up = False
+                        if not self.direction == self.preferred_direction:
+                            self.direction = self.preferred_direction
+                        else:
+                            self.direction = random.choice(current_session.directions)
 
             if self.strength < self.weight:
                 self.direction = 'still'
