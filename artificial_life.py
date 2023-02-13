@@ -9,6 +9,7 @@ from math import floor, sqrt
 import sys
 from dataclasses import dataclass
 from time import time
+import datetime
 
 from screen_output import ScreenController
 
@@ -62,6 +63,7 @@ class Session:
     max_attribute: int
     radiation_max: int
     gravity_on: bool
+    current_session_start_time: datetime
     rendering_on: bool = False
     max_movement: int = 0
     coord_map: tuple = ()
@@ -1299,6 +1301,7 @@ def show_current_session_stats():
     :return:
     """
     logging.info("Current session stats:")
+    logging.info(f"Current session start time: {current_session.current_session_start_time}")
     logging.info(f"Highest concurrent lifeforms: {current_session.highest_concurrent_lifeforms}")
     logging.info(f"Built entities: {current_session.building_entities}")
     logging.info(f"Max friend factor: {current_session.max_enemy_factor}")
@@ -1438,6 +1441,7 @@ def main():
                     current_session.highest_concurrent_lifeforms = 0
                     current_session.last_removal = -1
                     current_session.get_coord_map()
+                    current_session.current_session_start_time = datetime.datetime.now()
                     [class_generator(i, "wall") for i in range(args.wall_number)]
                     [class_generator(i) for i in range(args.life_form_total)]
 
@@ -1586,7 +1590,8 @@ if __name__ == '__main__':
                               radiation_change=args.radiation_change,
                               radiation_base_change_chance=args.radiation_base_change_chance,
                               max_attribute=args.max_num,
-                              gravity_on=args.gravity)
+                              gravity_on=args.gravity,
+                              current_session_start_time=datetime.datetime.now())
 
     [class_generator(i, "resource") for i in range(args.resources_number)]
     [class_generator(i, "wall") for i in range(args.wall_number)]
