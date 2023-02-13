@@ -986,6 +986,9 @@ class Wall(BaseEntity):
     def __init__(self, life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand=0):
         super().__init__(life_form_id, seed, seed2, seed3, start_x, start_y, max_attrib_expand)
 
+        # todo: it seems this is calling the superclass in a way that allows for lifeforms to be spawned when a wall
+        #  is meant ot be spawned, need to figure out the mechanics of this (more of a feature than a bug)
+
         self.wall_color_int = 127
         self.wall_color_float = 0.5
 
@@ -1439,6 +1442,7 @@ def main():
                     current_session.rendering_on = False
 
                     current_session.highest_concurrent_lifeforms = 0
+                    current_session.life_form_total_count = 0
                     current_session.last_removal = -1
                     current_session.get_coord_map()
                     current_session.current_session_start_time = datetime.datetime.now()
