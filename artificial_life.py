@@ -21,7 +21,8 @@ renderer_dir = os.path.join(os.path.dirname(__file__), 'pixel_composer')
 
 sys.path.append(renderer_dir)
 
-from pixel_composer.rasterizer import ScreenDrawer, FrameBuffer
+from pixel_composer.rasterizer import ScreenDrawer, FrameBuffer, FullScreenPatternShader, PerPixelLightingShader, \
+    MotionBlurShader, FullScreenGradientShader, FloatToRGBShader, ShaderStack, ToneMapShader, SpriteShader
 
 from threading import Thread
 
