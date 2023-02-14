@@ -23,6 +23,11 @@ A more detailed set of instructions is available on the blog post for this proje
 
 1. Install Raspbian on a Raspberry Pi. 
 2. Clone the repository
+```
+
+git clone --recursive https://github.com/LordofBone/Artificial_Life
+
+```
 3. Install the dependencies
 
 Install and set up the Unicorn HAT:
@@ -70,28 +75,41 @@ Arguments that can be passed:
                         behind the logic loop)
   -p POP_LIMIT, --population-limit POP_LIMIT
                         Limit of the population at any one time
+  -me MAX_ENEMY_FACTOR, --max-enemy-factor MAX_ENEMY_FACTOR
+                        Factor that calculates into the maximum breed
+                        threshold of an entity
   -dc DNA_CHAOS_CHANCE, --dna-chaos DNA_CHAOS_CHANCE
                         Percentage chance of random DNA upon breeding of
                         entities
   -shs CUSTOM_SIZE_SIMULATOR, --simulator-hat-size CUSTOM_SIZE_SIMULATOR
                         Maximum possible time to move number for entities
   -c, --combine-mode    Enables life forms to combine into bigger ones
-  -mc, --minecraft-mode
-                        Enables Minecraft mode
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
                         of entities
   -g, --gravity         Gravity enabled, still entities will fall to the floor
   -rc, --radiation-change
                         Whether to adjust radiation levels across the
                         simulation or not
+  -w WALL_NUMBER, --walls WALL_NUMBER
+                        Number of walls to randomly spawn that will block
+                        entities
+  -rs RESOURCES_NUMBER, --resources RESOURCES_NUMBER
+                        Number of resources to begin with that entities can
+                        mine
   -r RADIATION, --radiation RADIATION
                         Radiation enabled, will increase random mutation
                         chance and damage entities
   -mr MAX_RADIATION, --max-radiation MAX_RADIATION
                         Maximum radiation level possible
+  -rm RADIATION_DMG_MULTI, --radiation-multi RADIATION_DMG_MULTI
+                        Maximum radiation level possible
   -rbc RADIATION_BASE_CHANGE_CHANCE, --radiation-base-change RADIATION_BASE_CHANGE_CHANCE
                         The percentage chance that the base radiation level
                         will change randomly.
+  -be, --building-entities
+                        Whether lifeforms can build static blocks on the board
+  -wc WALL_CHANCE_MULTIPLIER, --wall-chance WALL_CHANCE_MULTIPLIER
+                        Whether lifeforms can build static blocks on the board
   -rt, --retry          Whether the loop will automatically restart upon the
                         expiry of all entities
   -sim, --unicorn-hat-sim
@@ -101,6 +119,8 @@ Arguments that can be passed:
                         works with Unicorn HAT Simulator
   -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Logging level
+  -sl, --sync-logic     Whether to sync the logic loop to the refresh rate of
+                        the screen
   -ff, --fixed-function
                         Whether to bypass pixel composer and use fixed
                         function for drawing (faster, less pretty)
