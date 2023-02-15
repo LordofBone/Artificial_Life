@@ -81,8 +81,9 @@ Arguments that can be passed:
   -dc DNA_CHAOS_CHANCE, --dna-chaos DNA_CHAOS_CHANCE
                         Percentage chance of random DNA upon breeding of
                         entities
-  -shs CUSTOM_SIZE_SIMULATOR, --simulator-hat-size CUSTOM_SIZE_SIMULATOR
-                        Maximum possible time to move number for entities
+  -shs CUSTOM_SIZE_SIMULATOR [CUSTOM_SIZE_SIMULATOR ...], --simulator-hat-size CUSTOM_SIZE_SIMULATOR [CUSTOM_SIZE_SIMULATOR ...]
+                        Size of the simulator HAT in pixels; to use pass in
+                        '-shs 16 16' for 16x16 pixels (x and y)
   -c, --combine-mode    Enables life forms to combine into bigger ones
   -tr, --trails         Stops the HAT from being cleared, resulting in trails
                         of entities

@@ -1094,6 +1094,7 @@ class DrawObjects(ScreenDrawer):
         self.frame_buffer_access = FrameBufferInit(self.session_info)
 
         self.render_stack = [
+            'background_shader_pass',
             'object_colour_pass',
             'removed_object_colour_pass',
             'fade_entity_pass',
@@ -1499,9 +1500,11 @@ if __name__ == '__main__':
                         default=initial_dna_chaos_chance,
                         help='Percentage chance of random DNA upon breeding of entities')
 
-    parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", type=tuple,
+    parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator",  nargs='+',
+                        type=int,
                         default=hat_simulator_or_panel_size,
-                        help='Maximum possible time to move number for entities')
+                        help="Size of the simulator HAT in pixels; to use pass in '-shs 16 16' for 16x16 pixels (x "
+                             "and y)")
 
     parser.add_argument('-c', '--combine-mode', action="store_true", dest="combine_mode", default=combine_mode,
                         help='Enables life forms to combine into bigger ones')
