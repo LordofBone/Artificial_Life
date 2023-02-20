@@ -1063,12 +1063,7 @@ class Resource(BaseEntity):
              self.blue_color), self.life_form_id)
 
         world_space_access.write_to_world_space(
-            (self.matrix_position_x - 1, self.matrix_position_y),
-            (self.red_color, self.green_color,
-             self.blue_color), self.life_form_id)
-
-        world_space_access.write_to_world_space(
-            (self.matrix_position_x, self.matrix_position_y - 1),
+            (self.matrix_position_x + 1, self.matrix_position_y + 1),
             (self.red_color, self.green_color,
              self.blue_color), self.life_form_id)
 
@@ -1103,6 +1098,21 @@ class DrawObjects(ScreenDrawer):
             'float_to_rgb_pass',
             'buffer_scan',
             'flush_buffer']
+
+        # cool effect, ensure a background shader is active and configured
+        # self.render_stack = [
+        #     'background_shader_pass',
+        #     'lighting_pass',
+        #     'lensing_pass',
+        #     'object_colour_pass',
+        #     'removed_object_colour_pass',
+        #     'fade_entity_pass',
+        #     'log_current_frame',
+        #     'tone_map_pass',
+        #     'render_frame_buffer',
+        #     'float_to_rgb_pass',
+        #     'buffer_scan',
+        #     'flush_buffer']
 
         # with lens flares and lighting
         # self.render_stack = ['background_shader_pass',
@@ -1152,23 +1162,24 @@ class FrameBufferInit(FrameBuffer):
         self.removed_entity_buffer = {}
 
         # WARNING: be careful with these, it can cause flashing images
-        # self.shader_stack.multi_shader_creator(input_shader=FullScreenPatternShader, number_of_shaders=2, base_number=4,
+        # self.shader_stack.multi_shader_creator(input_shader=FullScreenPatternShader, number_of_shaders=4, base_number=3,
         #                                        base_addition=16, base_rgb=(1.25, 0.0, 0.0))
         # self.shader_stack.add_to_shader_stack(
-        #     FullScreenPatternShader(count_number_max=32, shader_colour=(0.0, 1.25, 0.0)))
+        #     FullScreenPatternShader(count_number_max=445, shader_colour=(0.0, 1.25, 0.0)))
         # self.shader_stack.add_to_shader_stack(
         #     FullScreenPatternShader(count_number_max=31, shader_colour=(0.0, 0.0, 1.25)))
 
         # self.shader_stack.add_to_shader_stack(
-        #     FullScreenPatternShader(count_number_max=7, shader_colour=(0.0, 1.0, 0.0)))
+        #     FullScreenPatternShader(count_number_max=7, shader_colour=(0.7, 0.05, 0.001)))
 
         self.motion_blur.shader_colour = (0.0, 0.0, 0.0)
-        self.motion_blur.static_shader_alpha = 0.3
+        self.motion_blur.static_shader_alpha = 0.9
         self.motion_blur.float_clip_min = 0.001
 
-        self.lighting.shader_colour = (1.0, 1.0, 1.0)
+        self.lighting.shader_colour = (10.0, 1.0, 1.0)
         self.lighting.light_strength = 10.0
         self.lighting.moving_light = False
+        self.lighting.light_position = (32, 32)
 
     def write_to_removed_entity_buffer(self, pixel_coord, pixel_rgb):
         """
@@ -1500,7 +1511,7 @@ if __name__ == '__main__':
                         default=initial_dna_chaos_chance,
                         help='Percentage chance of random DNA upon breeding of entities')
 
-    parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator",  nargs='+',
+    parser.add_argument('-shs', '--simulator-hat-size', action="store", dest="custom_size_simulator", nargs='+',
                         type=int,
                         default=hat_simulator_or_panel_size,
                         help="Size of the simulator HAT in pixels; to use pass in '-shs 16 16' for 16x16 pixels (x "
