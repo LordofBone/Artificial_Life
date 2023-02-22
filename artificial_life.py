@@ -1097,7 +1097,8 @@ class DrawObjects(ScreenDrawer):
             'render_frame_buffer',
             'float_to_rgb_pass',
             'buffer_scan',
-            'flush_buffer']
+            'flush_buffer'
+        ]
 
         # cool effect, ensure a background shader is active and configured
         # self.render_stack = [
@@ -1112,22 +1113,25 @@ class DrawObjects(ScreenDrawer):
         #     'render_frame_buffer',
         #     'float_to_rgb_pass',
         #     'buffer_scan',
-        #     'flush_buffer']
+        #     'flush_buffer'
+        # ]
 
         # with lens flares and lighting
-        # self.render_stack = ['background_shader_pass',
-        #                      'object_colour_pass',
-        #                      'removed_object_colour_pass',
-        #                      'fade_entity_pass',
-        #                      'log_current_frame',
-        #                      'lighting_pass',
-        #                      'tone_map_pass',
-        #                      'render_frame_buffer',
-        #                      'float_to_rgb_pass',
-        #                      'sprite_pass',
-        #                      'write_texture',
-        #                      'buffer_scan',
-        #                      'flush_buffer']
+        # self.render_stack = [
+        #     'background_shader_pass',
+        #     'object_colour_pass',
+        #     'removed_object_colour_pass',
+        #     'fade_entity_pass',
+        #     'log_current_frame',
+        #     'lighting_pass',
+        #     'tone_map_pass',
+        #     'render_frame_buffer',
+        #     'float_to_rgb_pass',
+        #     'sprite_pass',
+        #     'write_texture',
+        #     'buffer_scan',
+        #     'flush_buffer'
+        # ]
 
         self.draw()
 
