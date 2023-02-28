@@ -1180,7 +1180,7 @@ class FrameBufferInit(FrameBuffer):
         self.motion_blur.static_shader_alpha = 0.9
         self.motion_blur.float_clip_min = 0.001
 
-        self.lighting.shader_colour = (10.0, 1.0, 1.0)
+        self.lighting.shader_colour = (10.0, 10.0, 10.0)
         self.lighting.light_strength = 10.0
         self.lighting.moving_light = False
         self.lighting.light_position = (32, 32)
