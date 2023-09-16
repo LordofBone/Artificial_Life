@@ -69,8 +69,17 @@ class Session:
     life_form_total_count: int = 0
     process_loop_on: bool = True
 
-    directions = ('move_up', 'move_down', 'move_left', 'move_right', 'move_up_and_right',
-                  'move_down_and_left', 'move_up_and_left', 'move_down_and_right', 'still')
+    directions = {
+        'move_up': (0, -1, -2),
+        'move_down': (0, 1, -2 if not gravity_on else 1),
+        'move_left': (-1, 0, -2),
+        'move_right': (1, 0, -2),
+        'move_up_and_right': (1, -1, -2),
+        'move_up_and_left': (-1, -1, -2),
+        'move_down_and_right': (1, 1, -2 if not gravity_on else 1),
+        'move_down_and_left': (-1, 1, -2 if not gravity_on else 1),
+        'still': (0, 0, 0),
+    }
 
     surrounding_point_choices = ('get_position_up', 'get_position_down', 'get_position_left',
                                  'get_position_right', 'get_position_up_and_right',
@@ -86,6 +95,19 @@ class Session:
         self.free_board_positions.extend(self.shuffled_coord_map)
 
         self.base_radiation = self.radiation
+
+    def regenerate_directions(self):
+        self.directions = {
+            'move_up': (0, -1, -2),
+            'move_down': (0, 1, -2 if not self.gravity_on else 1),
+            'move_left': (-1, 0, -2),
+            'move_right': (1, 0, -2),
+            'move_up_and_right': (1, -1, -2),
+            'move_up_and_left': (-1, -1, -2),
+            'move_down_and_right': (1, 1, -2 if not self.gravity_on else 1),
+            'move_down_and_left': (-1, 1, -2 if not self.gravity_on else 1),
+            'still': (0, 0, 0),
+        }
 
     def get_coord_map(self):
         """
@@ -112,24 +134,20 @@ class Session:
         This method adjusts the radiation level according to the radiation curve
         :return:
         """
-        if random.random() > self.radiation_base_change_chance:
-            pass
-        else:
+        if random.random() <= self.radiation_base_change_chance:
             self.base_radiation = floor(self.radiation_max * random.random())
 
-        self.radiation = max(
-            min(self.radiation_max, int(self.base_radiation * random.uniform(min([y for x, y in self.radiation_curve]),
-                                                                             max([y for x, y in
-                                                                                  self.radiation_curve])))), 0)
+        min_radiation_curve = min(y for x, y in self.radiation_curve)
+        max_radiation_curve = max(y for x, y in self.radiation_curve)
+        random_radiation = random.uniform(min_radiation_curve, max_radiation_curve)
+        self.radiation = max(min(self.radiation_max, int(self.base_radiation * random_radiation)), 0)
 
 
 class WorldSpaceControl:
     def __init__(self):
         self.template_world_space = {}
 
-        self.world_space = {}
-
-        self.world_space_2 = {}
+        self.world_spaces = {1: {}, 2: {}}
 
         self.world_time = 0
 
@@ -137,90 +155,51 @@ class WorldSpaceControl:
 
         self.buffer_ready = False
 
-    def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_selector=1):
-        """
-        This method writes to the world space
-        :param pixel_coord:
-        :param pixel_rgb:
-        :param entity_id:
-        :param world_space_selector:
-        :return:
-        """
-        if world_space_selector == 1:
-            self.world_space[pixel_coord] = pixel_rgb, entity_id
-        elif world_space_selector == 2:
-            self.world_space_2[pixel_coord] = pixel_rgb, entity_id
+    def write_to_world_space(self, pixel_coord, pixel_rgb, entity_id, world_space_i=1):
+        self.world_spaces[world_space_i][pixel_coord] = pixel_rgb, entity_id
 
-    def return_world_space(self, world_space_selector=1):
+    def return_world_space(self, world_space_id=1):
         """
         This method returns the world space
-        :param world_space_selector:
+        :param world_space_id:
         :return:
         """
-        if world_space_selector == 1:
-            return {key: value[0] for key, value in self.world_space.copy().items()}
-        elif world_space_selector == 2:
-            world_space_2_return = {key: value[0] for key, value in self.world_space_2.copy().items()}
-            self.world_space_2 = {}
-            return world_space_2_return
+        world_space = self.world_spaces[world_space_id].copy()
+        return {key: value[0] for key, value in world_space.items()}
 
-    def get_from_world_space(self, pixel_coord, world_space_selector=1):
+    def get_from_world_space(self, pixel_coord, world_space_id=1):
         """
         This method returns the value of a pixel in the world space
         :param pixel_coord:
-        :param world_space_selector:
+        :param world_space_id:
         :return:
         """
-        if world_space_selector == 1:
-            try:
-                return self.world_space[pixel_coord]
-            except KeyError:
-                return None
-        elif world_space_selector == 2:
-            try:
-                return self.world_space_2[pixel_coord]
-            except KeyError:
-                return None
+        return self.world_spaces[world_space_id].get(pixel_coord)
 
-    def del_world_space_item(self, coord, world_space_selector=1):
+    def del_world_space_item(self, coord, world_space_id=1):
         """
         This method deletes an item from the world space
         :param coord:
-        :param world_space_selector:
+        :param world_space_id:
         :return:
         """
-        if world_space_selector == 1:
-            try:
-                del self.world_space[coord]
-            except KeyError:
-                pass
-        elif world_space_selector == 2:
-            try:
-                del self.world_space_2[coord]
-            except KeyError:
-                pass
+        self.world_spaces[world_space_id].pop(coord, None)
 
-    def erase_world_space(self, world_space_selector=1):
+    def erase_world_space(self, world_space_id=1):
         """
         This method erases the world space
-        :param world_space_selector:
+        :param world_space_id:
         :return:
         """
-        if world_space_selector == 1:
-            self.world_space = {}
-        elif world_space_selector == 2:
-            self.world_space_2 = {}
+        self.world_spaces[world_space_id] = {}
 
-    def end_world_space(self, world_space_selector=1):
+    def end_world_space(self, world_space_id=1):
         """
         This method sets the world space to end, which is picked up by the rasterizer, which ends its loop
-        :param world_space_selector:
+        :param world_space_id:
         :return:
         """
-        if world_space_selector == 1:
-            self.world_space = {"end": "ended"}
-        elif world_space_selector == 2:
-            self.world_space_2 = {"end": "ended"}
+        self.world_spaces[world_space_id] = {"end": "ended"}
 
 
 class BaseEntity:
@@ -326,7 +305,7 @@ class BaseEntity:
         self.time_to_live_count = self.time_to_live
         self.strength = floor(self.max_attribute * random.random())
         self.compatibility_factor = floor(self.max_attribute * random.random())
-        self.direction = random.choice(current_session.directions)
+        self.direction = random.choice(list(current_session.directions.keys()))
         self.preferred_direction = self.direction
         if not self.wall_factor == 0:
             self.time_to_build = floor(self.max_attribute * random.random()) / self.wall_factor
@@ -358,34 +337,45 @@ class BaseEntity:
                                                 (self.red_color, self.green_color, self.blue_color),
                                                 self.life_form_id)
 
+    # def get_dna(self, dna_key, collided_life_form_id):
+    #     """
+    #     This method is used to get the dna either from the life form that is being collided with or the entity
+    #     itself, it will return the dna 50% of the time from the entity and 50% of the time from the collided entity,
+    #     or depending on the dna chaos chance it will return a random dna value
+    #     :param dna_key:
+    #     :param collided_life_form_id:
+    #     :return:
+    #     """
+    #     dna_chaos = floor(100 * random.random())
+    #     if dna_chaos <= current_session.get_dna_chaos_chance():
+    #         return get_random()
+    #     else:
+    #         if dna_key == 1:
+    #             if random.random() < .5:
+    #                 return self.life_seed1
+    #             else:
+    #                 return BaseEntity.lifeforms[collided_life_form_id].life_seed1
+    #         elif dna_key == 2:
+    #             if random.random() < .5:
+    #                 return self.life_seed2
+    #             else:
+    #                 return BaseEntity.lifeforms[collided_life_form_id].life_seed2
+    #         elif dna_key == 3:
+    #             if random.random() < .5:
+    #                 return self.life_seed3
+    #             else:
+    #                 return BaseEntity.lifeforms[collided_life_form_id].life_seed3
+
     def get_dna(self, dna_key, collided_life_form_id):
-        """
-        This method is used to get the dna either from the life form that is being collided with or the entity
-        itself, it will return the dna 50% of the time from the entity and 50% of the time from the collided entity,
-        or depending on the dna chaos chance it will return a random dna value
-        :param dna_key:
-        :param collided_life_form_id:
-        :return:
-        """
         dna_chaos = floor(100 * random.random())
         if dna_chaos <= current_session.get_dna_chaos_chance():
             return get_random()
+
+        seeds = [self.life_seed1, self.life_seed2, self.life_seed3]
+        if random.random() < .5:
+            return seeds[dna_key - 1]
         else:
-            if dna_key == 1:
-                if random.random() < .5:
-                    return self.life_seed1
-                else:
-                    return BaseEntity.lifeforms[collided_life_form_id].life_seed1
-            elif dna_key == 2:
-                if random.random() < .5:
-                    return self.life_seed2
-                else:
-                    return BaseEntity.lifeforms[collided_life_form_id].life_seed2
-            elif dna_key == 3:
-                if random.random() < .5:
-                    return self.life_seed3
-                else:
-                    return BaseEntity.lifeforms[collided_life_form_id].life_seed3
+            return getattr(BaseEntity.lifeforms[collided_life_form_id], f"life_seed{dna_key}")
 
     def add_coord_good_memory(self, x, y):
         if (x, y) in self.good_memories:
@@ -423,22 +413,51 @@ class BaseEntity:
         This method is used to get the stats of the life form
         :return:
         """
-        logger.debug(f'ID: {self.life_form_id}')
-        logger.debug(f'Seed 1: {self.life_seed1}')
-        logger.debug(f'Seed 2: {self.life_seed2}')
-        logger.debug(f'Seed 3: {self.life_seed3}')
-        logger.debug(f'Preferred Spawn Direction: {self.preferred_breed_direction}')
-        logger.debug(f'Preferred Direction: {self.preferred_direction}')
-        logger.debug(f'Direction: {self.direction}')
-        logger.debug(f'Time to move total: {self.time_to_move}')
-        logger.debug(f'Time to next move: {self.time_to_move_count}')
-        logger.debug(f'Total lifetime: {self.time_to_live}')
-        logger.debug(f'Time left to live: {self.time_to_live_count}')
-        logger.debug(f'Aggression Factor: {self.aggression_factor}')
-        logger.debug(f'Position X: {self.matrix_position_x}')
-        logger.debug(f'Position Y: {self.matrix_position_y}')
-        logger.debug(f'Surrounding positions: {self.positions_around_life_form}')
-        logger.debug(f'Color: R: {self.red_color} G: {self.green_color} B: {self.blue_color} \n')
+        if logger.isEnabledFor(logging.DEBUG):
+            stats = {
+                'ID': self.life_form_id,
+                'Seed 1': self.life_seed1,
+                'Seed 2': self.life_seed2,
+                'Seed 3': self.life_seed3,
+                'Preferred Spawn Direction': self.preferred_breed_direction,
+                'Preferred Direction': self.preferred_direction,
+                'Direction': self.direction,
+                'Time to move total': self.time_to_move,
+                'Time to next move': self.time_to_move_count,
+                'Total lifetime': self.time_to_live,
+                'Time left to live': self.time_to_live_count,
+                'Aggression Factor': self.aggression_factor,
+                'Position X': self.matrix_position_x,
+                'Position Y': self.matrix_position_y,
+                'Surrounding positions': self.positions_around_life_form,
+                'Color': f"R: {self.red_color} G: {self.green_color} B: {self.blue_color}"
+            }
+            for key, value in stats.items():
+                logger.debug(f'{key}: {value}')
+
+    # Define this as a method in your Entity class
+    def apply_movement(self):
+        if self.direction not in current_session.directions:
+            raise ValueError(f"Invalid direction {self.direction}")
+
+        dx, dy, momentum_change = current_session.directions[self.direction]
+        world_space_access.del_world_space_item((self.matrix_position_x, self.matrix_position_y))
+
+        self.matrix_position_x += dx
+        self.matrix_position_y += dy
+        self.momentum += momentum_change
+
+        if self.momentum <= 0:
+            self.momentum = 0
+        elif self.momentum >= 100:
+            self.momentum = 100
+
+        # Write new position in the buffer
+        world_space_access.write_to_world_space(
+            (self.matrix_position_x, self.matrix_position_y),
+            (self.red_color, self.green_color, self.blue_color),
+            self.life_form_id
+        )
 
     def process(self):
         """
@@ -484,56 +503,28 @@ class BaseEntity:
             if not self.alive:
                 return "Dead"
 
-            if self.direction == 'move_right':
-                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_left':
-                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_down':
-                self.adj_position = self.matrix_position_x, self.matrix_position_y + 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_up':
-                self.adj_position = self.matrix_position_x, self.matrix_position_y - 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_down_and_right':
-                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y + 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_up_and_left':
-                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y - 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_down_and_left':
-                self.adj_position = self.matrix_position_x - 1, self.matrix_position_y + 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
-            elif self.direction == 'move_up_and_right':
-                self.adj_position = self.matrix_position_x + 1, self.matrix_position_y - 1
-                if self.adj_position not in current_session.coord_map:
-                    self.adj_position = None
+            direction_vector = current_session.directions[self.direction]
+            self.adj_position = self.matrix_position_x + direction_vector[0], self.matrix_position_y + direction_vector[
+                1]
 
-            if not self.direction == 'still':
+            # Check if position is out of the board
+            if self.adj_position not in current_session.coord_map:
+                self.adj_position = None
+
+            if self.direction != 'still':
                 if not self.adj_position:
                     collision_detected = True
                     collided_life_form_id = None
                 else:
-
                     try:
                         s_item_life_form_id = \
                             world_space_access.get_from_world_space(self.adj_position)[1]
                         collision_detected = True
                         collided_life_form_id = s_item_life_form_id
                     except TypeError:
-
                         collision_detected = False
                         collided_life_form_id = None
             else:
-
                 collision_detected = False
                 collided_life_form_id = None
 
@@ -561,7 +552,7 @@ class BaseEntity:
                 if not self.direction == self.preferred_direction:
                     self.direction = self.preferred_direction
                 else:
-                    self.direction = random.choice(current_session.directions)
+                    self.direction = random.choice(list(current_session.directions.keys()))
 
                 if collided_life_form_id:
                     if not BaseEntity.lifeforms[collided_life_form_id].wall:
@@ -714,70 +705,7 @@ class BaseEntity:
             else:
                 collision_check = False
 
-            if collision_check == "Died":
-                return collision_check
-            elif not collision_check:
-                world_space_access.del_world_space_item(
-                    (self.matrix_position_x, self.matrix_position_y))
-
-                if self.direction == 'move_up':
-                    self.matrix_position_y -= 1
-                    self.momentum -= 2
-
-                if self.direction == 'move_down':
-                    self.matrix_position_y += 1
-                    if current_session.gravity_on:
-                        self.momentum += 1
-                    else:
-                        self.momentum -= 2
-
-                if self.direction == 'move_left':
-                    self.matrix_position_x -= 1
-                    self.momentum -= 2
-
-                if self.direction == 'move_right':
-                    self.matrix_position_x += 1
-                    self.momentum -= 2
-
-                if self.direction == 'move_up_and_right':
-                    self.matrix_position_y -= 1
-                    self.matrix_position_x += 1
-                    self.momentum -= 2
-
-                if self.direction == 'move_up_and_left':
-                    self.matrix_position_y -= 1
-                    self.matrix_position_x -= 1
-                    self.momentum -= 2
-
-                if self.direction == 'move_down_and_right':
-                    self.matrix_position_y += 1
-                    self.matrix_position_x += 1
-                    if current_session.gravity_on:
-                        self.momentum += 1
-                    else:
-                        self.momentum -= 2
-
-                if self.direction == 'move_down_and_left':
-                    self.matrix_position_y += 1
-                    self.matrix_position_x -= 1
-                    if current_session.gravity_on:
-                        self.momentum += 1
-                    else:
-                        self.momentum -= 2
-
-                if self.direction == 'still':
-                    pass
-
-                if self.momentum <= 0:
-                    self.momentum = 0
-                elif self.momentum >= 100:
-                    self.momentum = 100
-
-                # write new position in the buffer
-                world_space_access.write_to_world_space(
-                    (self.matrix_position_x, self.matrix_position_y),
-                    (self.red_color, self.green_color,
-                     self.blue_color), self.life_form_id)
+            self.apply_movement()
 
             # the breeding will attempt only if the current life form count is not above the
             # population limit
@@ -924,7 +852,7 @@ class BaseEntity:
                             if not self.direction == self.preferred_direction:
                                 self.direction = self.preferred_direction
                             else:
-                                self.direction = random.choice(current_session.directions)
+                                self.direction = random.choice(list(current_session.directions.keys()))
                 else:
                     # if combining is enabled set to the direction of the linked entity, however the other entity may
                     # have expired and weird things happen, and it may not be accessible from within the class holder
@@ -936,7 +864,7 @@ class BaseEntity:
                         if not self.direction == self.preferred_direction:
                             self.direction = self.preferred_direction
                         else:
-                            self.direction = random.choice(current_session.directions)
+                            self.direction = random.choice(list(current_session.directions.keys()))
 
             if self.strength < self.weight:
                 self.direction = 'still'
@@ -1273,6 +1201,7 @@ def gravity_switch():
     :return:
     """
     current_session.gravity_on = not current_session.gravity_on
+    current_session.regenerate_directions()
     logger.info(f"Gravity is now {current_session.gravity_on}")
 
 

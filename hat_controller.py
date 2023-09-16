@@ -2,94 +2,96 @@ import logging
 
 logger = logging.getLogger("hat-controller-logger")
 
+try:
+    import unicornhat as unicorn
+    import unicornhathd as unicornhd
+    from unicornhatmini import UnicornHATMini
+    simulator_exists = False
+except (ImportError, ModuleNotFoundError):
+    simulator_exists = True
+    try:
+        from unicorn_hat_sim import UnicornHatSim
+        from unicorn_hat_sim import unicornhat as unicorn
+        from unicorn_hat_sim import unicornhathd as unicornhd
+        from unicorn_hat_sim import unicornphat as UnicornHATMini
+    except ModuleNotFoundError:
+        logger.exception("UnicornHAT and Simulated Unicorn HAT not found")
 
 class UnicornHATController:
-    def __init__(self, screen_type, simulator, custom_size_simulator, led_brightness):
-        self.simulator_refresh = False
+    SCREEN_TYPE_MINI = "MINI"
+    SCREEN_TYPE_SD = "SD"
+    SCREEN_TYPE_HD = "HD"
+    SCREEN_TYPE_CUSTOM = "CUSTOM"
 
+    def __init__(self, screen_type, simulator=False, custom_size_simulator=None, led_brightness=0.5):
+        self.simulator_refresh = simulator_exists or simulator
+
+        if self.simulator_refresh:
+            print("Using Simulated Unicorn HAT")
+        else:
+            print("Using Unicorn HAT")
+
+        if screen_type == self.SCREEN_TYPE_MINI:
+            self.init_mini_screen(led_brightness)
+        elif screen_type == self.SCREEN_TYPE_SD:
+            self.init_sd_screen(led_brightness)
+        elif screen_type == self.SCREEN_TYPE_HD:
+            self.init_hd_screen(led_brightness)
+        elif screen_type == self.SCREEN_TYPE_CUSTOM:
+            self.init_custom_screen(custom_size_simulator, led_brightness)
+
+    def init_mini_screen(self, led_brightness):
         try:
-            import unicornhat as unicorn
-            import unicornhathd as unicornhd
-            from unicornhatmini import UnicornHATMini
-            print("Unicorn HAT install found, using Unicorn HAT")
-        except ImportError or ModuleNotFoundError:
-            try:
-                from unicorn_hat_sim import UnicornHatSim
-                from unicorn_hat_sim import unicornhat as unicorn
-                from unicorn_hat_sim import unicornhathd as unicornhd
-                from unicorn_hat_sim import unicornphat as UnicornHATMini
-                print("Unicorn HAT install not found, using Simulated Unicorn HAT")
-            except ModuleNotFoundError:
-                pass
-        except:
-            pass
+            self.screen = UnicornHATMini()
+        except TypeError:
+            self.screen = UnicornHATMini
+        self.screen.set_brightness(led_brightness)
+        self.screen.set_rotation(0)
 
+    def init_sd_screen(self, led_brightness):
+        self.screen = unicorn
+        self.screen.set_layout(unicorn.AUTO)
+        self.screen.brightness(led_brightness)
+        self.screen.rotation(0)
+
+    def init_hd_screen(self, led_brightness):
+        self.screen = unicornhd
+        self.screen.set_layout(unicornhd.AUTO)
+        self.screen.brightness(led_brightness)
+        self.screen.rotation(270)
+
+    def init_custom_screen(self, custom_size_simulator, led_brightness):
+        try:
+            self.screen = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
             self.simulator_refresh = True
+        except NameError:
+            logger.info("Custom mode set without simulator mode on, defaulting to HD physical HAT")
+            self.init_hd_screen(led_brightness)
 
-        if simulator:
-            from unicorn_hat_sim import UnicornHatSim
-
-            from unicorn_hat_sim import unicornhat as unicorn
-            from unicorn_hat_sim import unicornhathd as unicornhd
-            from unicorn_hat_sim import unicornphat as UnicornHATMini
-
-            self.simulator_refresh = True
-
-        if screen_type == "MINI":
-            # unicorn hat mini setup
-            # todo: figure out why this doesn't work with the phat simulator
-            try:
-                self.screen = UnicornHATMini()
-                self.screen.set_brightness(led_brightness)
-                self.screen.set_rotation(0)
-            except TypeError:
-                self.screen = UnicornHATMini
-        elif screen_type == "SD":
-            # unicorn hat + unicorn hat hd setup
-            self.screen.set_layout(self.screen.AUTO)
-            self.screen.brightness(led_brightness)
-            self.screen.rotation(0)
-        elif screen_type == "HD":
-            # unicorn hat + unicorn hat hd setup
-            self.screen = unicornhd
-            self.screen.set_layout(self.screen.AUTO)
-            self.screen.brightness(led_brightness)
-            self.screen.rotation(270)
-        elif screen_type == "CUSTOM":
-            # unicorn hat + unicorn hat hd setup
-            try:
-                self.screen = UnicornHatSim(custom_size_simulator[0], custom_size_simulator[1], 180)
-            except NameError:
-                logger.info(f"Custom mode set without simulator mode on, defaulting to HD physical HAT")
-                self.screen = unicornhd
-                screen_type = "HD"
-            self.screen.set_layout(self.screen.AUTO)
-            self.screen.brightness(led_brightness)
-            self.screen.rotation(0)
-            self.simulator_refresh = True
+        self.screen.set_layout(self.screen.AUTO)
+        self.screen.brightness(led_brightness)
+        self.screen.rotation(0)
 
     def get_shape(self):
         """
-        Get the shape of the screen, for use in the simulator logic
-        :return:
+        Returns the shape of the screen
         """
         return self.screen.get_shape()
 
     def set_pixel(self, x, y, r, g, b):
         """
-        Set a pixel on the screen
-        :param x:
-        :param y:
-        :param r:
-        :param g:
-        :param b:
-        :return:
+        Sets a pixel on the screen to the specified RGB color
+
+        :param x: x-coordinate of the pixel
+        :param y: y-coordinate of the pixel
+        :param r: Red component of the color
+        :param g: Green component of the color
+        :param b: Blue component of the color
         """
         self.screen.set_pixel(x, y, r, g, b)
 
     def show(self):
         """
-        Show the screen, nothing will be displayed until this is called
-        :return:
+        Refreshes the screen to reflect the current state
         """
         self.screen.show()
