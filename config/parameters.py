@@ -24,3 +24,4 @@ walls = 0
 resources = 0
 entities_build_walls = True
 wall_chance_multiplier = 512
+headless = False
