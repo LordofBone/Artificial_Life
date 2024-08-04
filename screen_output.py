@@ -52,3 +52,10 @@ class ScreenController:
         Show the current state of the board
         """
         self.screen.show()
+
+    def off(self):
+        """
+        Clear & Turn off the screen
+        """
+        self.screen.off()
+
