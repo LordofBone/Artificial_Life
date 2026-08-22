@@ -1,0 +1,31 @@
+name: PR checks
+
+on:
+  pull_request:
+  # A successful push run registers the check name with GitHub so it appears in
+  # the branch-protection status-check picker. PRs continue to be the primary
+  # trigger once the rule is configured.
+  push:
+  workflow_dispatch:
+
+# A new commit on the same PR supersedes any checks still running for an older
+# version of the branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python-syntax:
+    name: Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      # On pull_request events, checkout tests GitHub's synthetic merge commit.
+      # Requiring this check therefore verifies the PR against the current base.
+      - name: Check out the tested commit
+        uses: actions/checkout@v4
+
+      - name: Compile Python sources
+        run: python3 -m compileall -q .
