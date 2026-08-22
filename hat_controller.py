@@ -12,18 +12,18 @@ class UnicornHATController:
             import unicornhathd as unicornhd
             from unicornhatmini import UnicornHATMini
             print("Unicorn HAT install found, using Unicorn HAT")
-        except ImportError or ModuleNotFoundError:
+        except (ImportError, ModuleNotFoundError):
             try:
                 from unicorn_hat_sim import UnicornHatSim
                 from unicorn_hat_sim import unicornhat as unicorn
                 from unicorn_hat_sim import unicornhathd as unicornhd
                 from unicorn_hat_sim import unicornphat as UnicornHATMini
                 print("Unicorn HAT install not found, using Simulated Unicorn HAT")
+                self.simulator_refresh = True
             except ModuleNotFoundError:
                 pass
-        except:
-            pass
-
+        except Exception:
+            # fall back to simulator if anything unexpected happens during import
             self.simulator_refresh = True
 
         if simulator:
@@ -45,7 +45,8 @@ class UnicornHATController:
             except TypeError:
                 self.screen = UnicornHATMini
         elif screen_type == "SD":
-            # unicorn hat + unicorn hat hd setup
+            # unicorn hat setup for the standard definition HAT
+            self.screen = unicorn
             self.screen.set_layout(self.screen.AUTO)
             self.screen.brightness(led_brightness)
             self.screen.rotation(0)
