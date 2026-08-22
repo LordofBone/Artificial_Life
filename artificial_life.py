@@ -10,6 +10,7 @@ import sys
 from dataclasses import dataclass
 from time import time
 import datetime
+import signal
 
 from screen_output import ScreenController
 
@@ -1627,6 +1628,12 @@ if __name__ == '__main__':
         listener.start()
 
     Thread(target=main, daemon=True).start()
+
+    # register method to run when HUP signal is sent
+    def stop_signal(signum, frame):
+        screen_controller.off()
+        sys.exit(0)
+    signal.signal(signal.SIGHUP, stop_signal)
 
     if not args.fixed_function:
         draw_control = DrawObjects(output_controller=screen_controller,

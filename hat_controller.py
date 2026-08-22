@@ -93,3 +93,12 @@ class UnicornHATController:
         :return:
         """
         self.screen.show()
+
+    def off(self):
+        """
+        Blank the screen and turn it off
+        :return:
+        """
+        self.screen.clear()
+        self.screen.off()
+
